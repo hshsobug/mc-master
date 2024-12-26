@@ -20,6 +20,7 @@ package cmd
 import (
 	"context"
 	"log"
+	"math"
 	"strconv"
 	"strings"
 
@@ -90,6 +91,9 @@ EXAMPLES:
 `,
 }
 
+// ProgressReaderInstance is a global variable to hold the progress reader. sobug 进度监控
+var ProgressReaderInstance ProgressReader
+
 // mainPut is the entry point for put command.
 func mainPut(cliCtx *cli.Context) (e error) {
 	// sobug
@@ -157,6 +161,10 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	} else {
 		pg = newAccounter(totalBytes)
 	}
+
+	// sobug 存储进度读取器初始化后赋值
+	ProgressReaderInstance = pg
+
 	go func() {
 		opts := prepareCopyURLsOpts{
 			sourceURLs:              sourceURLs,
@@ -249,4 +257,33 @@ func showLastProgressBar(pg ProgressReader, e error) {
 			printMsg(accntReader.Stat())
 		}
 	}
+}
+
+// GetProgressStr sobug 进度返回拼接
+func GetProgressStr(pg ProgressReader) string {
+	if progressReader, ok := pg.(*progressBar); ok {
+		log.Println("ShowProgressReader progressBar")
+		finished := "0"
+		if progressReader.ProgressBar.IsFinished() {
+			finished = "1"
+		}
+		// 获取当前速度
+		return strconv.Itoa(int(math.Round(progressReader.ProgressBar.GetSpeed()))) + " " + strconv.FormatInt(progressReader.ProgressBar.Get(), 10) + " " + finished
+		//progressReader.print()
+	} else {
+		if accntReader, ok := pg.(*accounter); ok {
+			log.Println("ShowProgressReader accntReader")
+			accntReader.print()
+			return "ShowProgressReader accntReader"
+		} else {
+			log.Println("ShowProgressReader other")
+			return "ShowProgressReader other"
+		}
+	}
+
+}
+
+func (a *accounter) print() {
+	log.Printf("accounter current: %d, total: %d, startTime: %v, startValue: %d, refreshRate: %v, currentValue: %d \n",
+		a.current, a.total, a.startTime.Unix(), a.startValue, a.refreshRate, a.currentValue)
 }
