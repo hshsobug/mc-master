@@ -57,6 +57,7 @@ func main() {
 	http.Handle("/xmlrpc/SftpSetParameters", RPC)
 	http.Handle("/xmlrpc/SftpStartTransfer", RPC)
 	http.Handle("/xmlrpc/SftpGetStat", RPC)
+	http.Handle("/xmlrpc/SftpStopTransfer", RPC)
 
 	// 将 http.ListenAndServe 放在 goroutine 中运行
 	// go func() {
@@ -200,5 +201,13 @@ func (s *HTTPService) SftpGetStat(r *http.Request, args *HTTPGetStatParameters, 
 		log.Printf("mc.ProgressReaderInstance is nil")
 		reply.Message = "mc.ProgressReaderInstance is nil"
 	}
+	return nil
+}
+
+// SftpStopTransfer - 停止传输
+func (s *HTTPService) SftpStopTransfer(r *http.Request, args *HTTPGetStatParameters, reply *HTTPResponse) error {
+	log.Printf("Received SftpStopTransfer parameters: %+v", args)
+	mc.CancelFilePut() // 停止传输
+	reply.Message = ""
 	return nil
 }

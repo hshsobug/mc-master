@@ -39,6 +39,9 @@ type accounter struct {
 	currentValue int64
 	finishOnce   sync.Once
 	isFinished   chan struct{}
+
+	// sobug 速度属性
+	Speed float64
 }
 
 // Instantiate a new accounter.
@@ -61,6 +64,7 @@ func (a *accounter) write(current int64) float64 {
 	currentFromStart := current - a.startValue
 	if currentFromStart > 0 {
 		speed := float64(currentFromStart) / (float64(fromStart) / float64(time.Second))
+		a.Speed = speed
 		return speed
 	}
 	return 0.0
@@ -160,4 +164,8 @@ func (a *accounter) Read(p []byte) (n int, err error) {
 	n = len(p)
 	a.Add(int64(n))
 	return
+}
+
+func (a *accounter) GetSpeed() float64 {
+	return a.Speed
 }

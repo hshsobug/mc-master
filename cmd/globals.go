@@ -67,7 +67,8 @@ const (
 )
 
 var (
-	globalQuiet        = false               // Quiet flag set via command line
+	// sobug 默认 false
+	globalQuiet        = true                // Quiet flag set via command line
 	globalJSON         = false               // Json flag set via command line
 	globalJSONLine     = false               // Print json as single line.
 	globalDebug        = false               // Debug flag set via command line

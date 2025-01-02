@@ -93,6 +93,7 @@ EXAMPLES:
 
 // ProgressReaderInstance is a global variable to hold the progress reader. sobug 进度监控
 var ProgressReaderInstance ProgressReader
+var CancelPut context.CancelFunc
 
 // mainPut is the entry point for put command.
 func mainPut(cliCtx *cli.Context) (e error) {
@@ -106,8 +107,9 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	// sobug
 	log.Printf("mc put-main.go mainPut args:%+v", args)
 
-	ctx, cancelPut := context.WithCancel(globalContext)
-	defer cancelPut()
+	var ctx context.Context
+	ctx, CancelPut = context.WithCancel(globalContext)
+	defer CancelPut()
 
 	// part size
 	size := cliCtx.String("s")
@@ -267,14 +269,26 @@ func GetProgressStr(pg ProgressReader) string {
 		if progressReader.ProgressBar.IsFinished() {
 			finished = "1"
 		}
-		// 获取当前速度
-		return strconv.Itoa(int(math.Round(progressReader.ProgressBar.GetSpeed()))) + " " + strconv.FormatInt(progressReader.ProgressBar.Get(), 10) + " " + finished
+		result := strconv.Itoa(int(math.Round(progressReader.ProgressBar.GetSpeed()))) + " " + strconv.FormatInt(progressReader.ProgressBar.Get(), 10) + " " + finished
+		log.Panicln("ShowProgressReader progressBar result:", result)
+		return result
 		//progressReader.print()
 	} else {
 		if accntReader, ok := pg.(*accounter); ok {
 			log.Println("ShowProgressReader accntReader")
-			accntReader.print()
-			return "ShowProgressReader accntReader"
+			// accntReader.print()
+			finished := "0"
+			select {
+			case <-accntReader.isFinished:
+				// 通道已关闭，表示操作已完成
+				finished = "1"
+			default:
+				// 通道未关闭，表示操作仍在进行
+				log.Println("Operation is still ongoing")
+			}
+			result := strconv.Itoa(int(math.Round(accntReader.GetSpeed()))) + " " + strconv.FormatInt(accntReader.Get(), 10) + " " + finished
+			log.Panicln("ShowProgressReader accntReader result:", result)
+			return result
 		} else {
 			log.Println("ShowProgressReader other")
 			return "ShowProgressReader other"
@@ -286,4 +300,8 @@ func GetProgressStr(pg ProgressReader) string {
 func (a *accounter) print() {
 	log.Printf("accounter current: %d, total: %d, startTime: %v, startValue: %d, refreshRate: %v, currentValue: %d \n",
 		a.current, a.total, a.startTime.Unix(), a.startValue, a.refreshRate, a.currentValue)
+}
+
+func CancelFilePut() {
+	CancelPut()
 }
