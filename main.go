@@ -204,7 +204,7 @@ func (s *HTTPService) SftpGetStat(r *http.Request, args *HTTPGetStatParameters, 
 	return nil
 }
 
-// SftpStopTransfer - 停止传输
+// SftpStopTransfer - 停止传输接口
 func (s *HTTPService) SftpStopTransfer(r *http.Request, args *HTTPGetStatParameters, reply *HTTPResponse) error {
 	log.Printf("Received SftpStopTransfer parameters: %+v", args)
 	mc.CancelFilePut() // 停止传输
