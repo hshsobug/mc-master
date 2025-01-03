@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/minio/cli"
+	"github.com/minio/minio-go/v7"
 	"github.com/minio/pkg/v3/console"
 )
 
@@ -91,7 +92,7 @@ func mainGet(cliCtx *cli.Context) (e error) {
 	if !globalQuiet && !globalJSON { // set up progress bar
 		pg = newProgressBar(totalBytes)
 	} else {
-		pg = newAccounter(totalBytes)
+		pg = minio.NewAccounter(totalBytes)
 	}
 	go func() {
 		opts := prepareCopyURLsOpts{

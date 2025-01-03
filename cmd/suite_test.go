@@ -38,6 +38,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/minio/mc/pkg/disk"
+
+	"github.com/minio/minio-go/v7"
 )
 
 // RUN: go test -v ./... -run Test_FullSuite
@@ -2808,7 +2810,7 @@ func parseSingleODMessageJSONOutput(out string) (odMSG odMessage, err error) {
 	return
 }
 
-func parseSingleAccountStatJSONOutput(out string) (stat accountStat, err error) {
+func parseSingleAccountStatJSONOutput(out string) (stat minio.AccountStat, err error) {
 	err = json.Unmarshal([]byte(out), &stat)
 	if err != nil {
 		return

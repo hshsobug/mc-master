@@ -19,9 +19,11 @@ package cmd
 
 import (
 	"io"
+	"log"
 	"sync/atomic"
 
 	"github.com/minio/mc/pkg/probe"
+	"github.com/minio/minio-go/v7"
 	"github.com/minio/pkg/v3/console"
 )
 
@@ -49,7 +51,7 @@ type Status interface {
 // NewQuietStatus returns a quiet status object
 func NewQuietStatus(hook io.Reader) Status {
 	return &QuietStatus{
-		accounter: newAccounter(0),
+		Accounter: minio.NewAccounter(0),
 		hook:      hook,
 	}
 }
@@ -60,14 +62,14 @@ type QuietStatus struct {
 	// alignment on 32 bit machines. atomic.* functions crash if operand is not
 	// aligned at 64bit. See https://github.com/golang/go/issues/599
 	counts int64
-	*accounter
+	*minio.Accounter
 	hook io.Reader
 }
 
 // Read implements the io.Reader interface
 func (qs *QuietStatus) Read(p []byte) (n int, err error) {
 	qs.hook.Read(p)
-	return qs.accounter.Read(p)
+	return qs.Accounter.Read(p)
 }
 
 // SetCounts sets number of files uploaded
@@ -87,7 +89,7 @@ func (qs *QuietStatus) AddCounts(v int64) {
 
 // SetTotal sets the total of the progressbar, ignored for quietstatus
 func (qs *QuietStatus) SetTotal(v int64) Status {
-	qs.accounter.SetTotal(v)
+	qs.Accounter.SetTotal(v)
 	return qs
 }
 
@@ -97,17 +99,17 @@ func (qs *QuietStatus) SetCaption(_ string) {
 
 // Get returns the current number of bytes
 func (qs *QuietStatus) Get() int64 {
-	return qs.accounter.Get()
+	return qs.Accounter.Get()
 }
 
 // Total returns the total number of bytes
 func (qs *QuietStatus) Total() int64 {
-	return qs.accounter.Get()
+	return qs.Accounter.Get()
 }
 
 // Add bytes to current number of bytes
 func (qs *QuietStatus) Add(v int64) Status {
-	qs.accounter.Add(v)
+	qs.Accounter.Add(v)
 	return qs
 }
 
@@ -126,7 +128,8 @@ func (qs *QuietStatus) Start() {
 
 // Finish displays the accounting summary
 func (qs *QuietStatus) Finish() {
-	printMsg(qs.accounter.Stat())
+	log.Println("QuietStatus Finish!!")
+	printMsg(qs.Accounter.Stat())
 }
 
 // Update is ignored for quietstatus

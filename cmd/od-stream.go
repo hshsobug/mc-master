@@ -27,6 +27,7 @@ import (
 	"time"
 
 	humanize "github.com/dustin/go-humanize"
+	"github.com/minio/minio-go/v7"
 )
 
 // odSetSizes sets necessary values for object transfer.
@@ -151,7 +152,7 @@ func odCopy(ctx context.Context, odURLs URLs, args argKVS, odType string) (odMes
 	}
 
 	// Used to get transfer time
-	pg := newAccounter(combinedSize)
+	pg := minio.NewAccounter(combinedSize)
 
 	// Write to target.
 	targetClnt, err := newClientFromAlias(targetAlias, targetURL.String())
@@ -162,7 +163,7 @@ func odCopy(ctx context.Context, odURLs URLs, args argKVS, odType string) (odMes
 	fatalIf(err.Trace(targetURL.String()), "Unable to upload")
 
 	// Get upload time.
-	elapsed := time.Since(pg.startTime)
+	elapsed := time.Since(pg.StartTime)
 
 	message := odMessage{
 		Status:    "success",
@@ -237,7 +238,7 @@ func odDownload(ctx context.Context, odURLs URLs, args argKVS) (odMessage, error
 	}
 
 	// Accounter to get transfer time.
-	pg := newAccounter(-1)
+	pg := minio.NewAccounter(-1)
 
 	// Upload the file.
 	total, err := putTargetStream(ctx, "", targetPath, "", "", "",
@@ -245,7 +246,7 @@ func odDownload(ctx context.Context, odURLs URLs, args argKVS) (odMessage, error
 	fatalIf(err.Trace(targetPath), "Unable to upload an object")
 
 	// Get upload time.
-	elapsed := time.Since(pg.startTime)
+	elapsed := time.Since(pg.StartTime)
 
 	message := odMessage{
 		Status:    "success",

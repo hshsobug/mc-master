@@ -28,6 +28,8 @@ import (
 	"github.com/minio/cli"
 	"github.com/minio/mc/pkg/probe"
 	"github.com/minio/pkg/v3/console"
+
+	"github.com/minio/minio-go/v7"
 )
 
 // put command flags.
@@ -161,7 +163,7 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	if !globalQuiet && !globalJSON { // set up progress bar
 		pg = newProgressBar(totalBytes)
 	} else {
-		pg = newAccounter(totalBytes)
+		pg = minio.NewAccounter(totalBytes)
 	}
 
 	// sobug 存储进度读取器初始化后赋值
@@ -255,7 +257,8 @@ func showLastProgressBar(pg ProgressReader, e error) {
 	if progressReader, ok := pg.(*progressBar); ok {
 		progressReader.Finish()
 	} else {
-		if accntReader, ok := pg.(*accounter); ok {
+		if accntReader, ok := pg.(*minio.Accounter); ok {
+			log.Println("showLastProgressBar accntReader.Stat()!!!")
 			printMsg(accntReader.Stat())
 		}
 	}
@@ -274,12 +277,12 @@ func GetProgressStr(pg ProgressReader) string {
 		return result
 		//progressReader.print()
 	} else {
-		if accntReader, ok := pg.(*accounter); ok {
+		if accntReader, ok := pg.(*minio.Accounter); ok {
 			log.Println("ShowProgressReader accntReader")
 			// accntReader.print()
 			finished := "0"
 			select {
-			case <-accntReader.isFinished:
+			case <-accntReader.IsFinished:
 				// 通道已关闭，表示操作已完成
 				finished = "1"
 			default:
@@ -287,7 +290,7 @@ func GetProgressStr(pg ProgressReader) string {
 				log.Println("Operation is still ongoing")
 			}
 			result := strconv.Itoa(int(math.Round(accntReader.GetSpeed()))) + " " + strconv.FormatInt(accntReader.Get(), 10) + " " + finished
-			log.Panicln("ShowProgressReader accntReader result:", result)
+			log.Println("ShowProgressReader accntReader result:", result)
 			return result
 		} else {
 			log.Println("ShowProgressReader other")
@@ -295,11 +298,6 @@ func GetProgressStr(pg ProgressReader) string {
 		}
 	}
 
-}
-
-func (a *accounter) print() {
-	log.Printf("accounter current: %d, total: %d, startTime: %v, startValue: %d, refreshRate: %v, currentValue: %d \n",
-		a.current, a.total, a.startTime.Unix(), a.startValue, a.refreshRate, a.currentValue)
 }
 
 func CancelFilePut() {

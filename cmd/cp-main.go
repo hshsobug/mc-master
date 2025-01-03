@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"path/filepath"
 	"strings"
 
@@ -29,6 +30,7 @@ import (
 	"github.com/minio/cli"
 	json "github.com/minio/colorjson"
 	"github.com/minio/mc/pkg/probe"
+	"github.com/minio/minio-go/v7"
 	"github.com/minio/pkg/v3/console"
 )
 
@@ -314,7 +316,7 @@ func doCopySession(ctx context.Context, cancelCopy context.CancelFunc, cli *cli.
 	if !globalQuiet && !globalJSON { // set up progress bar
 		pg = newProgressBar(totalBytes)
 	} else {
-		pg = newAccounter(totalBytes)
+		pg = minio.NewAccounter(totalBytes)
 	}
 
 	sourceURLs := cli.Args()[:len(cli.Args())-1]
@@ -511,13 +513,14 @@ loop:
 			progressReader.Finish()
 		}
 	} else {
-		if accntReader, ok := pg.(*accounter); ok {
+		if accntReader, ok := pg.(*minio.Accounter); ok {
 			if errSeen || (cpAllFilesErr && totalObjects > 0) {
 				// We only erase a line if we are displaying a progress bar
 				if !globalQuiet && !globalJSON {
 					console.Eraseline()
 				}
 			} else {
+				log.Println("accntReader.Stat()!!!")
 				printMsg(accntReader.Stat())
 			}
 		}
