@@ -27,7 +27,7 @@ import (
 	"github.com/divan/gorilla-xmlrpc/xml"
 	"github.com/gorilla/rpc"
 
-	mc "github.com/minio/mc/cmd"
+	mc "github.com/hshsobug/mc-master/cmd"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
