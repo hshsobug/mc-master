@@ -19,8 +19,11 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -213,21 +216,94 @@ func mainPut(cliCtx *cli.Context) (e error) {
 				ifNotExists:      cliCtx.Bool("if-not-exists"),
 				dst:              dst,
 			})
+
+			// 获取用户目录
+			userProfile := os.Getenv("userprofile")
+			// 构建目标路径
+			targetDir := filepath.Join(userProfile, "scc", "NewOKs")
+			targetPath := filepath.Join(targetDir, dst)
+
 			if urls.Error != nil {
+				// 上传失败
 				// sobug 出错时不终止程序
 				log.Println("urls.Error: ", urls.Error)
-				// 出错后终止进度条
-				if progressReader, ok := pg.(*progressBar); ok {
-					progressReader.Finish()
+				// 出错时不finish 只报错
+				showLastProgressBar(pg, urls.Error.ToGoError())
+				// 出错后终止进度条,测试用 终止progressReader
+				// if progressReader, ok := pg.(*progressBar); ok {
+				// 	progressReader.Finish()
+				// }
+
+				// 失败的需要生成 .err 文件
+				if err := createERRFile(targetPath); err != nil {
+					log.Fatalf("无法创建 .err 文件: %v", err)
+				} else {
+					log.Printf(".err 文件创建成功: %s", targetPath)
 				}
+
 				return urls.Error.ToGoError()
 
 				// showLastProgressBar(pg, urls.Error.ToGoError())
 				// fatalIf(urls.Error.Trace(), "unable to upload")
 				// return
+			} else {
+				// 上传成功
+				log.Println("urls.Error is nil.urls", urls)
+				// 假设这是上传后的文件路径
+				// uploadedFilePath := "/Z/assets/12346.jpg"
+				log.Println("dst:", dst)
+
+				// 创建 .ok 文件
+				if err := createOKFile(targetPath); err != nil {
+					log.Fatalf("无法创建 .ok 文件: %v", err)
+				} else {
+					log.Printf(".ok 文件创建成功: %s", targetPath)
+				}
 			}
 		}
 	}
+}
+
+// 创建 .ok 文件
+func createOKFile(filePath string) error {
+	// 获取 .ok 文件的路径
+	okFilePath := fmt.Sprintf("%s.ok", filePath)
+	// 创建 .ok 文件所在的目录
+	okFileDir := filepath.Dir(okFilePath)
+	// 确保目录存在
+	if err := os.MkdirAll(okFileDir, os.ModePerm); err != nil {
+		return err
+	}
+	// 创建 .ok 文件
+	file, err := os.Create(okFilePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// 文件已经创建，不需要写入任何内容
+	return nil
+}
+
+// 创建 .err 文件
+func createERRFile(filePath string) error {
+	// 获取 .err 文件的路径
+	okFilePath := fmt.Sprintf("%s.err", filePath)
+	// 创建 .err 文件所在的目录
+	okFileDir := filepath.Dir(okFilePath)
+	// 确保目录存在
+	if err := os.MkdirAll(okFileDir, os.ModePerm); err != nil {
+		return err
+	}
+	// 创建 .err 文件
+	file, err := os.Create(okFilePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// 文件已经创建，不需要写入任何内容
+	return nil
 }
 
 func printPutURLsError(putURLs *URLs) {

@@ -43,11 +43,21 @@ func main() {
 		return
 	}
 
+	// 打开日志文件，如果不存在则创建，如果存在则追加内容
+	logFile, err := os.OpenFile("mc_logs.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("无法打开日志文件: %s", err)
+	}
+	defer logFile.Close()
+
+	// 设置日志输出位置为指定的日志文件
+	log.SetOutput(logFile)
+	// 设置日志格式，包括日期、时间和文件名
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	log.Println("Executable exePath:", exePath)
 
 	// 获取命令行参数 ./mc.exe 6666
 	log.Println("os.Args:", os.Args)
-
 	port := os.Args[1]
 	// 集成xmlrpc
 	RPC := rpc.NewServer()
