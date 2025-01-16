@@ -147,9 +147,13 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	// targetURL := args[len(args)-1]
 
 	// sobug 改为单个文件上传 源路径 目标路径 目标桶
-	sourceURLs := []string{args[len(args)-3]}
-	dst := args[len(args)-2]
-	targetURL := args[len(args)-1]
+	// sourceURLs := []string{args[len(args)-3]}
+	// dst := args[len(args)-2]
+	// userName := args[len(args)-1]
+	sourceURLs := []string{args[len(args)-4]}
+	dst := args[len(args)-3]
+	userName := args[len(args)-2]
+	targetURL := "minio-server/" + userName
 
 	// sobug
 	log.Printf("mc put-main.go mainPut sourceURLs:%+v", sourceURLs)
@@ -214,7 +218,7 @@ func mainPut(cliCtx *cli.Context) (e error) {
 				multipartSize:    size,
 				multipartThreads: strconv.Itoa(threads),
 				ifNotExists:      cliCtx.Bool("if-not-exists"),
-				dst:              dst,
+				dst:              "/cdata/render-data/dataserver/" + args[len(args)-1] + dst,
 			})
 
 			// 获取用户目录

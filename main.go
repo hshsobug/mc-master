@@ -32,7 +32,7 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-var globalHTTPParameters HTTPParameters
+var GlobalHTTPParameters HTTPParameters
 var exePath string
 
 func main() {
@@ -64,10 +64,7 @@ func main() {
 	xmlrpcCodec := xml.NewCodec()
 	RPC.RegisterCodec(xmlrpcCodec, "text/xml")
 	RPC.RegisterService(new(HTTPService), "")
-	http.Handle("/xmlrpc/SftpSetParameters", RPC)
-	http.Handle("/xmlrpc/SftpStartTransfer", RPC)
-	http.Handle("/xmlrpc/SftpGetStat", RPC)
-	http.Handle("/xmlrpc/SftpStopTransfer", RPC)
+	http.Handle("/xmlrpc/", RPC)
 
 	// 将 http.ListenAndServe 放在 goroutine 中运行
 	// go func() {
@@ -83,13 +80,13 @@ type HTTPParameters struct {
 	Password           string
 	Host               string
 	Port               string
-	ProxyType          string
+	ProxyType          int
 	ProxyHost          string
 	ProxyPort          string
 	ProxyUser          string
 	ProxyPwd           string
-	Compression        string
-	Verbose            string
+	Compression        bool
+	Verbose            bool
 	Minioadminuser     string
 	Minioadminpassword string
 	BucketIsExists     bool
@@ -98,16 +95,22 @@ type HTTPResponse struct {
 	Message string
 }
 
+var realUserName string
+
 // SftpSetParameters - 设置登录参数
 func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, reply *HTTPResponse) error {
 	log.Printf("Received parameters: %+v", args)
 
 	// 更新设置变量,重置设置标志
-	globalHTTPParameters = *args
+	GlobalHTTPParameters = *args
 
 	// 需要设置环境
 	log.Println("globalHttpParameters setting.")
-	httpHostParams := []string{exePath, "config", "host", "add", "minio-server", "http://" + globalHTTPParameters.Host + ":" + globalHTTPParameters.Port, globalHTTPParameters.Minioadminuser, globalHTTPParameters.Minioadminpassword}
+	// 为了匹配桶名规则，_转为-，大写转为小写
+	realUserName = GlobalHTTPParameters.Username
+	GlobalHTTPParameters.Username = strings.ToLower(strings.ReplaceAll(GlobalHTTPParameters.Username, "_", "-"))
+	log.Println("finnal bucketName.", GlobalHTTPParameters.Username)
+	httpHostParams := []string{exePath, "config", "host", "add", "minio-server", "http://" + GlobalHTTPParameters.Host + ":" + GlobalHTTPParameters.Port, GlobalHTTPParameters.Minioadminuser, GlobalHTTPParameters.Minioadminpassword}
 	if e := mc.Main(httpHostParams); e != nil {
 		log.Println("minio config host add minio-server error.", e)
 		reply.Message = e.Error()
@@ -138,10 +141,10 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 	// 多个文件用 | 隔开，可以根据需要分割字符串来处理多个文件
 
 	// 上传前检查桶名是否存在，不存在则创建
-	if !globalHTTPParameters.BucketIsExists {
-		endpoint := globalHTTPParameters.Host + ":" + globalHTTPParameters.Port
-		accessKeyID := globalHTTPParameters.Minioadminuser
-		secretAccessKey := globalHTTPParameters.Minioadminpassword
+	if !GlobalHTTPParameters.BucketIsExists {
+		endpoint := GlobalHTTPParameters.Host + ":" + GlobalHTTPParameters.Port
+		accessKeyID := GlobalHTTPParameters.Minioadminuser
+		secretAccessKey := GlobalHTTPParameters.Minioadminpassword
 		useSSL := false
 
 		// 初始化minio客户端对象
@@ -154,16 +157,16 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 		}
 
 		// 检查bucket是否存在
-		exists, err := minioClient.BucketExists(context.Background(), globalHTTPParameters.Username)
+		exists, err := minioClient.BucketExists(context.Background(), GlobalHTTPParameters.Username)
 		if err != nil {
 			log.Println("minio BucketExists error.", err)
 		}
 		if exists {
-			log.Printf("Bucket %s already exists\n", globalHTTPParameters.Username)
-			globalHTTPParameters.BucketIsExists = exists
+			log.Printf("Bucket %s already exists\n", GlobalHTTPParameters.Username)
+			GlobalHTTPParameters.BucketIsExists = exists
 		} else {
-			log.Printf("Bucket %s does not exist\n", globalHTTPParameters.Username)
-			bucket := "minio-server/" + globalHTTPParameters.Username
+			log.Printf("Bucket %s does not exist\n", GlobalHTTPParameters.Username)
+			bucket := "minio-server/" + GlobalHTTPParameters.Username
 			mbParams := []string{exePath, "mb", bucket}
 			log.Println("minio mb " + bucket)
 			if e := mc.Main(mbParams); e != nil {
@@ -171,7 +174,7 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 				log.Println("minio mb error.", e)
 			} else {
 				log.Println("minio mb success.")
-				globalHTTPParameters.BucketIsExists = true
+				GlobalHTTPParameters.BucketIsExists = true
 			}
 		}
 	}
@@ -181,11 +184,12 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 	srcs := strings.Split(args.Src, "|")
 	dsts := strings.Split(args.Dst, "|")
 	log.Printf("Cmds: %v, Srcs: %v, Dsts: %v", cmds, srcs, dsts)
-
+	// 目前只支持 put
+	cmds[0] = "put"
 	// sobug
 	go func() {
 		// 另起线程提交上传任务
-		uploadParams := []string{exePath, cmds[0], srcs[0], dsts[0], "minio-server/" + globalHTTPParameters.Username}
+		uploadParams := []string{exePath, cmds[0], srcs[0], dsts[0], GlobalHTTPParameters.Username, realUserName}
 		if e := mc.Main(uploadParams); e != nil {
 			log.Println("Main upload error.", e)
 			reply.Message = e.Error()
@@ -209,7 +213,7 @@ func (s *HTTPService) SftpGetStat(r *http.Request, args *HTTPGetStatParameters, 
 		reply.Message = mc.GetProgressStr(mc.ProgressReaderInstance)
 	} else {
 		log.Printf("mc.ProgressReaderInstance is nil")
-		reply.Message = "mc.ProgressReaderInstance is nil"
+		reply.Message = "0 0 0"
 	}
 	return nil
 }
