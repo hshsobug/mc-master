@@ -100,11 +100,22 @@ EXAMPLES:
 var ProgressReaderInstance ProgressReader
 var CancelPut context.CancelFunc
 
+// SuccessFileTotal 已传输成功字节数
+var SuccessFileTotal int64
+
+// SuccessFileNum 传输成功文件数
+var SuccessFileNum int64
+
+// AllFileNum 总传输文件数
+var AllFileNum int64
+
+var Finished = "0"
+
+// Alias 配置alis名称
+var Alias string
+
 // mainPut is the entry point for put command.
 func mainPut(cliCtx *cli.Context) (e error) {
-	// sobug
-	log.Println("mainPut.")
-
 	args := cliCtx.Args()
 	if len(args) < 2 {
 		showCommandHelpAndExit(cliCtx, 1) // last argument is exit code.
@@ -135,6 +146,7 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	// Parse encryption keys per command.
 	encryptionKeys, err := validateAndCreateEncryptionKeys(cliCtx)
 	if err != nil {
+		Finished = "1"
 		err.Trace(cliCtx.Args()...)
 	}
 	fatalIf(err, "SSE Error")
@@ -153,7 +165,7 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	sourceURLs := []string{args[len(args)-4]}
 	dst := args[len(args)-3]
 	userName := args[len(args)-2]
-	targetURL := "minio-server/" + userName
+	targetURL := Alias + "/" + userName
 
 	// sobug
 	log.Printf("mc put-main.go mainPut sourceURLs:%+v", sourceURLs)
@@ -164,14 +176,14 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	var totalObjects, totalBytes int64
 
 	// Store a progress bar or an accounter
-	var pg ProgressReader
+	// var pg ProgressReader
 
 	// Enable progress bar reader only during default mode.
-	if !globalQuiet && !globalJSON { // set up progress bar
-		pg = newProgressBar(totalBytes)
-	} else {
-		pg = minio.NewAccounter(totalBytes)
-	}
+	// if !globalQuiet && !globalJSON { // set up progress bar
+	// 	pg = newProgressBar(totalBytes)
+	// } else {
+	var pg = minio.NewAccounter(totalBytes)
+	// }
 
 	// sobug 存储进度读取器初始化后赋值
 	ProgressReaderInstance = pg
@@ -187,6 +199,7 @@ func mainPut(cliCtx *cli.Context) (e error) {
 		for putURLs := range preparePutURLs(ctx, opts) {
 			if putURLs.Error != nil {
 				putURLsCh <- putURLs
+				Finished = "1"
 				break
 			}
 			totalBytes += putURLs.SourceContent.Size
@@ -209,6 +222,7 @@ func mainPut(cliCtx *cli.Context) (e error) {
 			if putURLs.Error != nil {
 				printPutURLsError(&putURLs)
 				showLastProgressBar(pg, putURLs.Error.ToGoError())
+				Finished = "1"
 				return
 			}
 			urls := doCopy(ctx, doCopyOpts{
@@ -240,10 +254,13 @@ func mainPut(cliCtx *cli.Context) (e error) {
 
 				// 失败的需要生成 .err 文件
 				if err := createERRFile(targetPath); err != nil {
-					log.Fatalf("无法创建 .err 文件: %v", err)
+					log.Printf("无法创建 .err 文件: %v", err)
 				} else {
 					log.Printf(".err 文件创建成功: %s", targetPath)
 				}
+
+				Finished = "1"
+				ProgressReaderInstance.(*minio.Accounter).Speed = 0
 
 				return urls.Error.ToGoError()
 
@@ -255,7 +272,10 @@ func mainPut(cliCtx *cli.Context) (e error) {
 				log.Println("urls.Error is nil.urls", urls)
 				// 假设这是上传后的文件路径
 				// uploadedFilePath := "/Z/assets/12346.jpg"
-				log.Println("dst:", dst)
+				// log.Println("dst:", dst)
+
+				SuccessFileTotal += totalBytes
+				SuccessFileNum++
 
 				// 创建 .ok 文件
 				if err := createOKFile(targetPath); err != nil {
@@ -338,7 +358,7 @@ func showLastProgressBar(pg ProgressReader, e error) {
 		progressReader.Finish()
 	} else {
 		if accntReader, ok := pg.(*minio.Accounter); ok {
-			log.Println("showLastProgressBar accntReader.Stat()!!!")
+			// log.Println("showLastProgressBar accntReader.Stat()!!!")
 			printMsg(accntReader.Stat())
 		}
 	}
@@ -346,37 +366,51 @@ func showLastProgressBar(pg ProgressReader, e error) {
 
 // GetProgressStr sobug 进度返回拼接
 func GetProgressStr(pg ProgressReader) string {
-	if progressReader, ok := pg.(*progressBar); ok {
-		log.Println("ShowProgressReader progressBar")
-		finished := "0"
-		if progressReader.ProgressBar.IsFinished() {
-			finished = "1"
+	// if progressReader, ok := pg.(*progressBar); ok {
+	// 	log.Println("ShowProgressReader progressBar")
+	// 	finished := "0"
+	// 	if progressReader.ProgressBar.IsFinished() {
+	// 		finished = "1"
+	// 	}
+	// 	result := strconv.Itoa(int(math.Round(progressReader.ProgressBar.GetSpeed()))) + " " + strconv.FormatInt(progressReader.ProgressBar.Get(), 10) + " " + finished
+	// 	log.Println("ShowProgressReader progressBar result:", result)
+	// 	return result
+	// 	//progressReader.print()
+	// } else {
+	if accntReader, ok := pg.(*minio.Accounter); ok {
+		log.Println("ShowProgressReader accntReader")
+		// accntReader.print()
+
+		// select {
+		// case <-accntReader.IsFinished:
+		// 	// 通道已关闭，表示操作已完成
+		// 	finished = "1"
+		// default:
+		// 	// 通道未关闭，表示操作仍在进行
+		// 	log.Println("Operation is still ongoing")
+		// }
+		// SuccessFileNum 传输成功文件数
+		if SuccessFileNum == AllFileNum {
+			Finished = "1"
 		}
-		result := strconv.Itoa(int(math.Round(progressReader.ProgressBar.GetSpeed()))) + " " + strconv.FormatInt(progressReader.ProgressBar.Get(), 10) + " " + finished
-		log.Panicln("ShowProgressReader progressBar result:", result)
+		var result string
+		select {
+		case <-accntReader.IsFinished:
+			// 通道已关闭，表示操作已完成
+			result = strconv.Itoa(int(math.Round(accntReader.GetSpeed()))) + " " + strconv.FormatInt(SuccessFileTotal, 10) + " " + Finished
+		default:
+			// 通道未关闭，表示操作仍在进行
+			log.Println("Operation is still ongoing")
+			result = strconv.Itoa(int(math.Round(accntReader.GetSpeed()))) + " " + strconv.FormatInt(SuccessFileTotal+accntReader.Get(), 10) + " " + Finished
+		}
+		// result := strconv.Itoa(int(math.Round(achhhhcntReader.GetSpeed()))) + " " + strconv.FormatInt(accntReader.Get(), 10) + " " + finished
+		log.Println("ShowProgressReader accntReader result:", result)
 		return result
-		//progressReader.print()
 	} else {
-		if accntReader, ok := pg.(*minio.Accounter); ok {
-			log.Println("ShowProgressReader accntReader")
-			// accntReader.print()
-			finished := "0"
-			select {
-			case <-accntReader.IsFinished:
-				// 通道已关闭，表示操作已完成
-				finished = "1"
-			default:
-				// 通道未关闭，表示操作仍在进行
-				log.Println("Operation is still ongoing")
-			}
-			result := strconv.Itoa(int(math.Round(accntReader.GetSpeed()))) + " " + strconv.FormatInt(accntReader.Get(), 10) + " " + finished
-			log.Println("ShowProgressReader accntReader result:", result)
-			return result
-		} else {
-			log.Println("ShowProgressReader other")
-			return "ShowProgressReader other"
-		}
+		log.Println("ShowProgressReader other")
+		return "ShowProgressReader other"
 	}
+	// }
 
 }
 

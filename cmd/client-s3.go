@@ -18,9 +18,6 @@
 package cmd
 
 import (
-	"log"
-	"reflect"
-
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -1120,17 +1117,17 @@ func (c *S3Client) Put(ctx context.Context, reader io.Reader, size int64, progre
 
 	opts.Dst = putOpts.dst
 	// sobug
-	t := reflect.TypeOf(opts)
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		value := reflect.ValueOf(opts).Field(i)
-		if field.Name != "customHeaders" {
-			log.Printf("mc client-s3.go %s: %v\n", field.Name, value.Interface())
-		}
-	}
-	log.Printf("mc client-s3.go %s: %v\n", ctx, ctx)
-	log.Printf("mc client-s3.go %s: %v\n", bucket, bucket)
-	log.Printf("mc client-s3.go %s: %v\n", object, object)
+	// t := reflect.TypeOf(opts)
+	// for i := 0; i < t.NumField(); i++ {
+	// 	field := t.Field(i)
+	// 	value := reflect.ValueOf(opts).Field(i)
+	// 	if field.Name != "customHeaders" {
+	// 		log.Printf("mc client-s3.go %s: %v\n", field.Name, value.Interface())
+	// 	}
+	// }
+	// log.Printf("mc client-s3.go %s: %v\n", ctx, ctx)
+	// log.Printf("mc client-s3.go %s: %v\n", bucket, bucket)
+	// log.Printf("mc client-s3.go %s: %v\n", object, object)
 
 	ui, e := c.api.PutObject(ctx, bucket, object, reader, size, opts)
 	if e != nil {

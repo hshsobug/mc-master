@@ -34,10 +34,13 @@ import (
 	"github.com/minio/mc/pkg/probe"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/pkg/v3/console"
+	"github.com/minio/pkg/v3/quick"
 	"golang.org/x/term"
 )
 
 const cred = "YellowItalics"
+
+var GlobalSessionToken string
 
 var aliasSetFlags = []cli.Flag{
 	cli.StringFlag{
@@ -156,6 +159,12 @@ func checkAliasSetSyntax(ctx *cli.Context, accessKey, secretKey string, deprecat
 
 // setAlias - set an alias config.
 func setAlias(alias string, aliasCfgV10 aliasConfigV10) aliasMessage {
+	// sobug 解密
+	// if err := quick.DecryptFile(mustGetMcConfigPath()); err != nil {
+	// 	log.Panicln("decryptFile the alias config file error.", err)
+	// }
+	// defer quick.EncryptFile(mustGetMcConfigPath()) // 重新加密
+
 	mcCfgV10, err := loadMcConfig()
 	fatalIf(err.Trace(globalMCConfigVersion), "Unable to load config `"+mustGetMcConfigPath()+"`.")
 
@@ -164,6 +173,11 @@ func setAlias(alias string, aliasCfgV10 aliasConfigV10) aliasMessage {
 
 	err = saveMcConfig(mcCfgV10)
 	fatalIf(err.Trace(alias), "Unable to update hosts in config version `"+mustGetMcConfigPath()+"`.")
+
+	// sobug 加密
+	if err := quick.EncryptFile(mustGetMcConfigPath()); err != nil {
+		fatalIf(probe.NewError(err), "配置文件加密失败")
+	}
 
 	return aliasMessage{
 		Alias:     alias,
@@ -342,11 +356,12 @@ func mainAliasSet(cli *cli.Context, deprecated bool) error {
 	fatalIf(err.Trace(alias, url, accessKey), "Unable to initialize new alias from the provided credentials.")
 
 	msg := setAlias(alias, aliasConfigV10{
-		URL:       s3Config.HostURL,
-		AccessKey: s3Config.AccessKey,
-		SecretKey: s3Config.SecretKey,
-		API:       s3Config.Signature,
-		Path:      path,
+		URL:          s3Config.HostURL,
+		AccessKey:    s3Config.AccessKey,
+		SecretKey:    s3Config.SecretKey,
+		SessionToken: GlobalSessionToken,
+		API:          s3Config.Signature,
+		Path:         path,
 	}) // Add an alias with specified credentials.
 
 	msg.op = "set"

@@ -127,3 +127,5 @@ require (
 replace github.com/minio/minio-go/v7 => E:\vscode_workspace\minio-go
 
 replace github.com/cheggaaa/pb => E:\vscode_workspace\pb@v1.0.29
+
+replace github.com/divan/gorilla-xmlrpc/xml => E:\vscode_workspace\gorilla-xmlrpc

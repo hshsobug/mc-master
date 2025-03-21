@@ -366,3 +366,14 @@ func getPrometheusToken(hostConfig *aliasConfigV10) (string, error) {
 	}
 	return token, nil
 }
+
+const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+func GenerateRandomString(n int) string {
+	rand.Seed(time.Now().UnixNano()) // 初始化随机种子[1,2,4](@ref)
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))] // 从字符集中随机选取字符[1,4](@ref)
+	}
+	return string(b)
+}

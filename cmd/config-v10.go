@@ -18,6 +18,7 @@
 package cmd
 
 import (
+	"log"
 	"sync"
 
 	"github.com/minio/mc/pkg/probe"
@@ -127,6 +128,12 @@ func loadConfigV10() (*configV10, *probe.Error) {
 	if e != nil {
 		return nil, probe.NewError(e)
 	}
+
+	// sobug 解密
+	if err := quick.DecryptFile(mustGetMcConfigPath()); err != nil {
+		log.Panicln("decryptFile the alias config file error.", err)
+	}
+	defer quick.EncryptFile(mustGetMcConfigPath()) // 重新加密
 
 	// Load config at configPath, fails if config is not
 	// accessible, malformed or version missing.

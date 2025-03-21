@@ -21,13 +21,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"unicode"
 
 	"github.com/minio/cli"
 	json "github.com/minio/colorjson"
 	"github.com/minio/mc/pkg/probe"
-	"github.com/minio/pkg/v3/console"
 )
 
 // causeMessage container for golang error messages
@@ -75,10 +75,10 @@ func fatal(err *probe.Error, msg string, data ...interface{}) {
 			Error:  errorMsg,
 		}, "", " ")
 		if e != nil {
-			console.Fatalln(probe.NewError(e))
+			log.Println(probe.NewError(e))
 		}
-		console.Println(string(json))
-		console.Fatalln()
+		log.Println(string(json))
+		//console.Fatalln()
 	}
 
 	msg = fmt.Sprintf(msg, data...)
@@ -115,7 +115,7 @@ func fatal(err *probe.Error, msg string, data ...interface{}) {
 		}
 	}
 
-	console.Fatalln(fmt.Sprintf("%s %s", msg, errmsg))
+	log.Printf("%s %s", msg, errmsg)
 }
 
 // Exit coder wraps cli new exit error with a
@@ -153,9 +153,9 @@ func errorIf(err *probe.Error, msg string, data ...interface{}) {
 			Error:  errorMsg,
 		}, "", " ")
 		if e != nil {
-			console.Fatalln(probe.NewError(e))
+			log.Println(probe.NewError(e))
 		}
-		console.Println(string(json))
+		log.Println(string(json))
 		return
 	}
 	msg = fmt.Sprintf(msg, data...)
@@ -167,10 +167,10 @@ func errorIf(err *probe.Error, msg string, data ...interface{}) {
 		} else {
 			e = err.ToGoError()
 		}
-		console.Errorln(fmt.Sprintf("%s %s", msg, e))
+		log.Printf("%s %s", msg, e)
 		return
 	}
-	console.Errorln(fmt.Sprintf("%s %s", msg, err))
+	log.Printf("%s %s", msg, err)
 }
 
 // deprecatedError function for deprecated commands

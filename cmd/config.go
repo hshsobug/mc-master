@@ -29,6 +29,7 @@ import (
 
 	"github.com/minio/mc/pkg/probe"
 	"github.com/minio/pkg/v3/env"
+	"github.com/minio/pkg/v3/quick"
 
 	"github.com/mitchellh/go-homedir"
 )
@@ -181,6 +182,12 @@ func getAliasConfig(alias string) (*aliasConfigV10, *probe.Error) {
 	if err != nil {
 		return nil, err.Trace(alias)
 	}
+
+	// sobug 加密
+	if err := quick.DecryptFile(mustGetMcConfigPath()); err != nil {
+		return nil, probe.NewError(err)
+	}
+	defer quick.EncryptFile(mustGetMcConfigPath()) // 重新加密
 
 	// if host is exact return quickly.
 	if _, ok := mcCfg.Aliases[alias]; ok {

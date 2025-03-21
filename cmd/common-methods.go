@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -207,9 +206,6 @@ func putTargetStream(ctx context.Context, alias, urlStr, mode, until, legalHold 
 	if legalHold != "" {
 		opts.metadata[AmzObjectLockLegalHold] = legalHold
 	}
-
-	// sobug
-	log.Println("targetClnt.Put")
 
 	n, err := targetClnt.Put(ctx, reader, size, progress, opts)
 	if err != nil {
@@ -501,9 +497,6 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 			ifNotExists:      uploadOpts.ifNotExists,
 			dst:              uploadOpts.dst,
 		}
-
-		// sobug
-		log.Println("putOpts:", putOpts)
 
 		if isReadAt(reader) || length == 0 {
 			_, err = putTargetStream(ctx, targetAlias, targetURL.String(), mode, until,
