@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"path/filepath"
 	"strconv"
@@ -124,6 +125,7 @@ func odCopy(ctx context.Context, odURLs URLs, args argKVS, odType string) (odMes
 	targetAlias := odURLs.TargetAlias
 	targetURL := odURLs.TargetContent.URL
 	targetPath := filepath.ToSlash(filepath.Join(targetAlias, targetURL.Path))
+	log.Println("targetPath!!!:", targetPath)
 
 	getOpts := GetOptions{}
 

@@ -292,7 +292,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	}
 
 	// 6. 更新全局参数（保留原始凭证用于刷新）
-	GlobalHTTPParameters = *args
+	// GlobalHTTPParameters = *args
 
 	return nil
 }
@@ -325,6 +325,8 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 	sessionToken := credentialCache.SessionToken
 	useSSL := false
 	credentialMutex.Unlock()
+
+	log.Println("GlobalHTTPParameters.Username.", GlobalHTTPParameters.Username)
 
 	// 初始化minio客户端对象
 	minioClient, err := minio.New(endpoint, &minio.Options{
@@ -367,6 +369,7 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 				Region: "us-east-1",
 			})
 			if err != nil {
+				log.Println("minioClient.MakeBucket error:", err)
 				// 处理存储桶已存在的情况
 				exists, err := minioClient.BucketExists(context.Background(), GlobalHTTPParameters.Username)
 				if err != nil {
@@ -440,14 +443,13 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 			// }
 			// 构建上传命令的参数列表
 			// 设置环境变量传递 SessionToken
-			os.Setenv("MC_STS_TOKEN", credentialCache.SessionToken)
 			uploadParams := []string{exePath, cmds[0], srcs[index], dsts[index], GlobalHTTPParameters.Username, realUserName}
 
 			if e := mc.Main(uploadParams); e != nil {
 				log.Printf("Main upload error for %s: %v", srcs[index], e)
 				reply.Message = e.Error()
 			} else {
-				log.Printf("Main upload success for %s.", srcs[index])
+				log.Printf("Main upload success for %s", srcs[index])
 			}
 		}
 	}()
