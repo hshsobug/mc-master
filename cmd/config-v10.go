@@ -18,7 +18,6 @@
 package cmd
 
 import (
-	"log"
 	"sync"
 
 	"github.com/minio/mc/pkg/probe"
@@ -114,34 +113,47 @@ func loadConfigV10() (*configV10, *probe.Error) {
 	cfgMutex.RLock()
 	defer cfgMutex.RUnlock()
 
-	// If already cached, return the cached value.
-	if cacheCfgV10 != nil {
-		return cacheCfgV10, nil
-	}
+	// // If already cached, return the cached value.
+	// if cacheCfgV10 != nil {
+	// 	return cacheCfgV10, nil
+	// }
 
-	if !isMcConfigExists() {
-		return nil, errInvalidArgument().Trace()
-	}
+	// if !isMcConfigExists() {
+	// 	return nil, errInvalidArgument().Trace()
+	// }
 
-	// Initialize a new config loader.
-	qc, e := quick.NewConfig(newConfigV10(), nil)
-	if e != nil {
-		return nil, probe.NewError(e)
-	}
+	// // Initialize a new config loader.
+	// qc, e := quick.NewConfig(newConfigV10(), nil)
+	// if e != nil {
+	// 	return nil, probe.NewError(e)
+	// }
 
-	// sobug 解密
-	if err := quick.DecryptFile(mustGetMcConfigPath()); err != nil {
-		log.Panicln("decryptFile the alias config file error.", err)
-	}
-	defer quick.EncryptFile(mustGetMcConfigPath()) // 重新加密
+	// // sobug 解密
+	// if err := quick.DecryptFile(mustGetMcConfigPath()); err != nil {
+	// 	log.Panicln("decryptFile the alias config file error.", err)
+	// }
+	// defer quick.EncryptFile(mustGetMcConfigPath()) // 重新加密
 
-	// Load config at configPath, fails if config is not
-	// accessible, malformed or version missing.
-	if e = qc.Load(mustGetMcConfigPath()); e != nil {
-		return nil, probe.NewError(e)
-	}
+	// // Load config at configPath, fails if config is not
+	// // accessible, malformed or version missing.
+	// if e = qc.Load(mustGetMcConfigPath()); e != nil {
+	// 	return nil, probe.NewError(e)
+	// }
 
-	cfgV10 := qc.Data().(*configV10)
+	// cfgV10 := qc.Data().(*configV10)
+	cfgV10 := &configV10{
+		Version: "10",
+		Aliases: map[string]aliasConfigV10{
+			Alias: {
+				URL:          Url,
+				AccessKey:    GlobalAccessKey,
+				SecretKey:    GlobalSecretKey,
+				SessionToken: GlobalSessionToken,
+				API:          "s3v4",
+				Path:         "auto",
+			},
+		},
+	}
 
 	// Cache config.
 	cacheCfgV10 = cfgV10

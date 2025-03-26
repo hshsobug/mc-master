@@ -113,6 +113,7 @@ var Finished = "0"
 
 // Alias 配置alis名称
 var Alias string
+var Url string
 
 // mainPut is the entry point for put command.
 func mainPut(cliCtx *cli.Context) (e error) {

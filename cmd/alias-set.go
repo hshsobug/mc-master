@@ -34,12 +34,13 @@ import (
 	"github.com/minio/mc/pkg/probe"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/pkg/v3/console"
-	"github.com/minio/pkg/v3/quick"
 	"golang.org/x/term"
 )
 
 const cred = "YellowItalics"
 
+var GlobalAccessKey string
+var GlobalSecretKey string
 var GlobalSessionToken string
 
 var aliasSetFlags = []cli.Flag{
@@ -175,9 +176,9 @@ func setAlias(alias string, aliasCfgV10 aliasConfigV10) aliasMessage {
 	fatalIf(err.Trace(alias), "Unable to update hosts in config version `"+mustGetMcConfigPath()+"`.")
 
 	// sobug 加密
-	if err := quick.EncryptFile(mustGetMcConfigPath()); err != nil {
-		fatalIf(probe.NewError(err), "配置文件加密失败")
-	}
+	// if err := quick.EncryptFile(mustGetMcConfigPath()); err != nil {
+	// 	fatalIf(probe.NewError(err), "配置文件加密失败")
+	// }
 
 	return aliasMessage{
 		Alias:     alias,

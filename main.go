@@ -247,49 +247,53 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	credentialCache.RefreshTime = time.Now()
 	log.Printf("生成新STS凭证 有效期至: %s", credentialCache.ExpiryTime.Format("2006-01-02 15:04:05"))
 	log.Println("credentialCache.AccessKey", credentialCache.AccessKey)
+	mc.GlobalAccessKey = credentialCache.AccessKey
+	mc.GlobalSecretKey = credentialCache.SecretKey
 	mc.GlobalSessionToken = credentialCache.SessionToken
+
 	mc.Alias = newAlias
+	mc.Url = "http://" + args.Host + ":" + strconv.Itoa(args.Port)
 
 	// 4. 使用临时凭证配置MinIO客户端
-	httpHostParams := []string{
-		exePath, "config", "host", "add",
-		mc.Alias,
-		"http://" + args.Host + ":" + strconv.Itoa(args.Port),
-		credentialCache.AccessKey,
-		credentialCache.SecretKey, "--api", "s3v4",
-	}
+	// httpHostParams := []string{
+	// 	exePath, "config", "host", "add",
+	// 	mc.Alias,
+	// 	"http://" + args.Host + ":" + strconv.Itoa(args.Port),
+	// 	credentialCache.AccessKey,
+	// 	credentialCache.SecretKey, "--api", "s3v4",
+	// }
 
-	if e := mc.Main(httpHostParams); e != nil {
-		log.Println("MinIO配置失败:", e)
-		reply.Message = e.Error()
-	} else {
-		log.Println("MinIO配置成功")
+	// if e := mc.Main(httpHostParams); e != nil {
+	// 	log.Println("MinIO配置失败:", e)
+	// 	reply.Message = e.Error()
+	// } else {
+	log.Println("MinIO配置成功")
 
-		// 5. 启动异步凭证刷新检查
-		go func() {
-			for {
-				time.Sleep(1 * time.Hour) // 每小时检查一次
-				credentialMutex.Lock()
-				if time.Now().After(credentialCache.ExpiryTime.Add(-24 * time.Hour)) {
-					log.Println("检测到凭证即将过期，自动刷新...")
-					params := STSCredentialParams{
-						STSEndpoint:    "http://" + args.Host + ":" + strconv.Itoa(args.Port),
-						LDAPUsername:   args.Username,
-						LDAPPassword:   args.Password,
-						ExpiryDuration: 168 * time.Hour,
-					}
-					if newAK, newSK, newSt, err := GenerateSTSCredentials(params); err == nil {
-						credentialCache.AccessKey = newAK
-						credentialCache.SecretKey = newSK
-						credentialCache.SessionToken = newSt
-						credentialCache.ExpiryTime = time.Now().Add(168 * time.Hour)
-						log.Println("凭证自动刷新成功")
-					}
+	// 5. 启动异步凭证刷新检查
+	go func() {
+		for {
+			time.Sleep(1 * time.Hour) // 每小时检查一次
+			credentialMutex.Lock()
+			if time.Now().After(credentialCache.ExpiryTime.Add(-24 * time.Hour)) {
+				log.Println("检测到凭证即将过期，自动刷新...")
+				params := STSCredentialParams{
+					STSEndpoint:    "http://" + args.Host + ":" + strconv.Itoa(args.Port),
+					LDAPUsername:   args.Username,
+					LDAPPassword:   args.Password,
+					ExpiryDuration: 168 * time.Hour,
 				}
-				credentialMutex.Unlock()
+				if newAK, newSK, newSt, err := GenerateSTSCredentials(params); err == nil {
+					credentialCache.AccessKey = newAK
+					credentialCache.SecretKey = newSK
+					credentialCache.SessionToken = newSt
+					credentialCache.ExpiryTime = time.Now().Add(168 * time.Hour)
+					log.Println("凭证自动刷新成功")
+				}
 			}
-		}()
-	}
+			credentialMutex.Unlock()
+		}
+	}()
+	// }
 
 	// 6. 更新全局参数（保留原始凭证用于刷新）
 	// GlobalHTTPParameters = *args

@@ -16,3 +16,5 @@ mc.gz
 .DS_Store
 .vscode/
 mc.exe
+
+sc_mc.exe

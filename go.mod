@@ -130,4 +130,4 @@ replace github.com/cheggaaa/pb => E:\vscode_workspace\pb@v1.0.29
 
 replace github.com/divan/gorilla-xmlrpc/xml => E:\vscode_workspace\gorilla-xmlrpc
 
-replace github.com/minio/pkg => E:\vscode_workspace\pkg-v3@v3.0.13
+replace github.com/minio/pkg/v3 => E:\vscode_workspace\pkg-v3@v3.0.13
