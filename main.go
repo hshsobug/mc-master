@@ -236,6 +236,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	ak, sk, st, err := GenerateSTSCredentials(params)
 	if err != nil {
 		reply.Message = fmt.Sprintf("生成STS凭证失败: %v", err)
+		log.Println(reply.Message)
 		return nil
 	}
 
