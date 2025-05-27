@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/divan/gorilla-xmlrpc/xml"
@@ -38,6 +39,10 @@ import (
 
 var GlobalHTTPParameters HTTPParameters
 var exePath string
+
+func init() {
+	syscall.NewLazyDLL("kernel32.dll").NewProc("SetDllDirectoryW").Call(0)
+}
 
 func main() {
 	// 获取exe绝对路径
