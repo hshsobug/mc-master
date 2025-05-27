@@ -183,10 +183,11 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	// if !globalQuiet && !globalJSON { // set up progress bar
 	// 	pg = newProgressBar(totalBytes)
 	// } else {
-	var pg = minio.NewAccounter(totalBytes)
+	//var pg = minio.NewAccounter(totalBytes)
 	// }
 
 	// sobug 存储进度读取器初始化后赋值
+	var pg = minio.NewAccounter(totalBytes)
 	ProgressReaderInstance = pg
 
 	go func() {
@@ -245,7 +246,7 @@ func mainPut(cliCtx *cli.Context) (e error) {
 			if urls.Error != nil {
 				// 上传失败
 				// sobug 出错时不终止程序
-				log.Println("urls.Error: ", urls.Error)
+				log.Println("doCopy urls.Error: ", urls.Error)
 				// 出错时不finish 只报错
 				showLastProgressBar(pg, urls.Error.ToGoError())
 				// 出错后终止进度条,测试用 终止progressReader
@@ -367,29 +368,10 @@ func showLastProgressBar(pg ProgressReader, e error) {
 
 // GetProgressStr sobug 进度返回拼接
 func GetProgressStr(pg ProgressReader) string {
-	// if progressReader, ok := pg.(*progressBar); ok {
-	// 	log.Println("ShowProgressReader progressBar")
-	// 	finished := "0"
-	// 	if progressReader.ProgressBar.IsFinished() {
-	// 		finished = "1"
-	// 	}
-	// 	result := strconv.Itoa(int(math.Round(progressReader.ProgressBar.GetSpeed()))) + " " + strconv.FormatInt(progressReader.ProgressBar.Get(), 10) + " " + finished
-	// 	log.Println("ShowProgressReader progressBar result:", result)
-	// 	return result
-	// 	//progressReader.print()
-	// } else {
 	if accntReader, ok := pg.(*minio.Accounter); ok {
 		log.Println("ShowProgressReader accntReader")
 		// accntReader.print()
 
-		// select {
-		// case <-accntReader.IsFinished:
-		// 	// 通道已关闭，表示操作已完成
-		// 	finished = "1"
-		// default:
-		// 	// 通道未关闭，表示操作仍在进行
-		// 	log.Println("Operation is still ongoing")
-		// }
 		// SuccessFileNum 传输成功文件数
 		if SuccessFileNum == AllFileNum {
 			Finished = "1"
@@ -411,7 +393,6 @@ func GetProgressStr(pg ProgressReader) string {
 		log.Println("ShowProgressReader other")
 		return "ShowProgressReader other"
 	}
-	// }
 
 }
 

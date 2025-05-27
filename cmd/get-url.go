@@ -20,6 +20,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/minio/mc/pkg/probe"
 	"github.com/minio/minio-go/v7"
@@ -30,19 +31,36 @@ func prepareGetURLs(ctx context.Context, o prepareCopyURLsOpts) chan URLs {
 	copyURLsCh := make(chan URLs)
 	go func(o prepareCopyURLsOpts) {
 		defer close(copyURLsCh)
+		// 打印初始参数
+		// log.Printf("Initial parameters: %+v\n", o)
+
 		copyURLsContent, err := guessGetURLType(ctx, o)
 		if err != nil {
+			// 打印错误信息
+			log.Printf("Error guessing URL type: %v\n", err)
 			copyURLsCh <- URLs{Error: err}
 			return
 		}
 
+		// 打印copyURLsContent的值
+		// log.Printf("Guessed URL content: %+v\n", copyURLsContent)
+
 		switch copyURLsContent.copyType {
 		case copyURLsTypeA:
-			copyURLsCh <- prepareCopyURLsTypeA(ctx, *copyURLsContent, o)
+			result := prepareCopyURLsTypeA(ctx, *copyURLsContent, o)
+			// 打印结果
+			// log.Printf("Result for type A: %+v\n", result)
+			copyURLsCh <- result
 		case copyURLsTypeB:
-			copyURLsCh <- prepareCopyURLsTypeB(ctx, *copyURLsContent, o)
+			result := prepareCopyURLsTypeB(ctx, *copyURLsContent, o)
+			// 打印结果
+			// log.Printf("Result for type B: %+v\n", result)
+			copyURLsCh <- result
 		default:
-			copyURLsCh <- URLs{Error: errInvalidArgument().Trace(o.sourceURLs...)}
+			err := errInvalidArgument().Trace(o.sourceURLs...)
+			// 打印错误信息
+			// log.Printf("Invalid argument error: %v\n", err)
+			copyURLsCh <- URLs{Error: err}
 		}
 	}(o)
 
@@ -51,9 +69,13 @@ func prepareGetURLs(ctx context.Context, o prepareCopyURLsOpts) chan URLs {
 		defer close(finalCopyURLsCh)
 		for cpURLs := range copyURLsCh {
 			if cpURLs.Error != nil {
+				// 打印错误信息
+				log.Printf("Error in final channel: %v\n", cpURLs.Error)
 				finalCopyURLsCh <- cpURLs
 				continue
 			}
+			// 打印最终结果
+			// log.Printf("Final result: %+v\n", cpURLs)
 			finalCopyURLsCh <- cpURLs
 		}
 	}()
@@ -71,6 +93,11 @@ func guessGetURLType(ctx context.Context, o prepareCopyURLsOpts) (*copyURLsConte
 	cc.sourceAlias, _, _ = mustExpandAlias(cc.sourceURL)
 	// Find alias and expanded clientURL.
 	cc.targetAlias, cc.targetURL, _ = mustExpandAlias(o.targetURL)
+	// sobug
+	// log.Println("sourceURL:", cc.sourceURL)
+	// log.Println("sourceAlias:", cc.sourceAlias)
+	// log.Println("targetURL:", cc.targetURL)
+	// log.Println("targetAlias:", cc.targetAlias)
 
 	if len(o.sourceURLs) == 1 { // 1 Source, 1 Target
 		var err *probe.Error

@@ -19,6 +19,9 @@ package cmd
 
 import (
 	"context"
+	"log"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/minio/cli"
@@ -63,15 +66,18 @@ EXAMPLES:
 `,
 }
 
+var CancelGet context.CancelFunc
+
 // mainGet is the entry point for get command.
 func mainGet(cliCtx *cli.Context) (e error) {
 	args := cliCtx.Args()
-	if len(args) != 2 {
+	if len(args) < 2 {
 		showCommandHelpAndExit(cliCtx, 1) // last argument is exit code.
 	}
 
-	ctx, cancelGet := context.WithCancel(globalContext)
-	defer cancelGet()
+	var ctx context.Context
+	ctx, CancelGet = context.WithCancel(globalContext)
+	defer CancelGet()
 
 	encryptionKeys, err := validateAndCreateEncryptionKeys(cliCtx)
 	if err != nil {
@@ -80,20 +86,37 @@ func mainGet(cliCtx *cli.Context) (e error) {
 	fatalIf(err, "unable to parse encryption keys")
 
 	// get source and target
-	sourceURLs := args[:len(args)-1]
-	targetURL := args[len(args)-1]
+	// sourceURLs := args[:len(args)-1]
+	// targetURL := args[len(args)-1]
+	sourcePath := args[len(args)-4]
+	dst := args[len(args)-3]
+	userName := args[len(args)-2]
+	// sourceURLs := []string{args[len(args)-4]}
+	// targetURL := Alias + "/" + userName
+	sourceURLs := []string{Alias + "/" + userName + sourcePath}
+	targetURL := args[len(args)-3]
+
+	// sobug
+	log.Printf("mc get-main.go mainGet sourceURLs:%+v", sourceURLs)
+	log.Printf("mc get-main.go mainGet dst:%+v", dst)
+	log.Printf("mc get-main.go mainGet targetURL:%+v", targetURL)
 
 	getURLsCh := make(chan URLs, 10000)
 	var totalObjects, totalBytes int64
 
 	// Store a progress bar or an accounter
-	var pg ProgressReader
+	// var pg ProgressReader
 	// Enable progress bar reader only during default mode.
-	if !globalQuiet && !globalJSON { // set up progress bar
-		pg = newProgressBar(totalBytes)
-	} else {
-		pg = minio.NewAccounter(totalBytes)
-	}
+	// if !globalQuiet && !globalJSON { // set up progress bar
+	// 	pg = newProgressBar(totalBytes)
+	// } else {
+	// 	pg = minio.NewAccounter(totalBytes)
+	// }
+
+	var pg = minio.NewAccounter(totalBytes)
+	// sobug 存储进度读取器初始化后赋值
+	ProgressReaderInstance = pg
+
 	go func() {
 		opts := prepareCopyURLsOpts{
 			sourceURLs:              sourceURLs,
@@ -105,9 +128,13 @@ func mainGet(cliCtx *cli.Context) (e error) {
 
 		for getURLs := range prepareGetURLs(ctx, opts) {
 			if getURLs.Error != nil {
+				log.Println("getURLs.Error: ", getURLs.Error)
 				getURLsCh <- getURLs
+				Finished = "1"
 				break
 			}
+			totalBytes += getURLs.SourceContent.Size
+			pg.SetTotal(totalBytes)
 			totalObjects++
 			getURLsCh <- getURLs
 		}
@@ -126,6 +153,7 @@ func mainGet(cliCtx *cli.Context) (e error) {
 			if getURLs.Error != nil {
 				printGetURLsError(&getURLs)
 				showLastProgressBar(pg, getURLs.Error.ToGoError())
+				Finished = "1"
 				return
 			}
 			urls := doCopy(ctx, doCopyOpts{
@@ -133,11 +161,44 @@ func mainGet(cliCtx *cli.Context) (e error) {
 				pg:                  pg,
 				encryptionKeys:      encryptionKeys,
 				updateProgressTotal: true,
+				dst:                 "/cdata/render-data/dataserver/" + args[len(args)-1] + sourcePath,
 			})
+			// 获取用户目录
+			userProfile := os.Getenv("userprofile")
+			// 构建目标路径
+			targetDir := filepath.Join(userProfile, "scc", "NewOKs")
+			targetPath := filepath.Join(targetDir, sourcePath)
 			if urls.Error != nil {
-				e = urls.Error.ToGoError()
-				showLastProgressBar(pg, e)
-				return
+				// 下载失败
+				log.Println("doCopy urls.Error: ", urls.Error)
+				showLastProgressBar(pg, urls.Error.ToGoError())
+				// 失败的需要生成 .err 文件
+				if err := createERRFile(targetPath); err != nil {
+					log.Printf("无法创建 .err 文件: %v", err)
+				} else {
+					log.Printf(".err 文件创建成功: %s", targetPath)
+				}
+
+				Finished = "1"
+				ProgressReaderInstance.(*minio.Accounter).Speed = 0
+				return urls.Error.ToGoError()
+			} else {
+				// 下载成功
+				log.Println("urls.Error is nil,urls:", urls)
+				// 假设这是上传后的文件路径
+				// uploadedFilePath := "/Z/assets/12346.jpg"
+				// log.Println("dst:", dst)
+
+				SuccessFileTotal += ProgressReaderInstance.Get()
+				pg.SetTotal(SuccessFileTotal)
+				SuccessFileNum++
+
+				// 创建 .ok 文件
+				if err := createOKFile(targetPath); err != nil {
+					log.Fatalf("无法创建 .ok 文件: %v", err)
+				} else {
+					log.Printf(".ok 文件创建成功: %s", targetPath)
+				}
 			}
 		}
 	}
@@ -158,4 +219,8 @@ func printGetURLsError(cpURLs *URLs) {
 		errorIf(cpURLs.Error.Trace(),
 			"Unable to download.")
 	}
+}
+
+func CancelFileGet() {
+	CancelGet()
 }

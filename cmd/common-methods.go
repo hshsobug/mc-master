@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -288,10 +289,9 @@ func getAllMetadata(ctx context.Context, sourceAlias, sourceURLStr string, srcSS
 	return filterMetadata(metadata), nil
 }
 
-// uploadSourceToTargetURL - uploads to targetURL from source.
-// optionally optimizes copy for object sizes <= 5GiB by using
-// server side copy operation.
 func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTargetURLOpts) URLs {
+	// log.Println("开始上传源到目标URL")
+
 	sourceAlias := uploadOpts.urls.SourceAlias
 	sourceURL := uploadOpts.urls.SourceContent.URL
 	sourceVersion := uploadOpts.urls.SourceContent.VersionID
@@ -308,10 +308,8 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 	metadata := map[string]string{}
 	var mode, until, legalHold string
 
-	// add object retention fields in metadata for target, if target wants
-	// to override defaults from source, usually happens in `cp` command.
-	// for the most part source metadata is copied over.
 	if uploadOpts.urls.TargetContent.RetentionEnabled {
+		// log.Println("处理目标对象的保留策略")
 		m := minio.RetentionMode(strings.ToUpper(uploadOpts.urls.TargetContent.RetentionMode))
 		if !m.IsValid() {
 			return uploadOpts.urls.WithError(probe.NewError(errors.New("invalid retention mode")).Trace(targetURL.String()))
@@ -332,10 +330,8 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 		}
 	}
 
-	// add object legal hold fields in metadata for target, if target wants
-	// to override defaults from source, usually happens in `cp` command.
-	// for the most part source metadata is copied over.
 	if uploadOpts.urls.TargetContent.LegalHoldEnabled {
+		// log.Println("处理目标对象的合法持有")
 		switch minio.LegalHoldStatus(uploadOpts.urls.TargetContent.LegalHold) {
 		case minio.LegalHoldDisabled:
 		case minio.LegalHoldEnabled:
@@ -352,10 +348,10 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 		metadata[http.CanonicalHeaderKey(k)] = v
 	}
 
-	// Optimize for server side copy if the host is same.
 	if sourceAlias == targetAlias && !uploadOpts.isZip {
-		// preserve new metadata and save existing ones.
+		// log.Println("执行服务器端复制")
 		if uploadOpts.preserve {
+			// log.Println("保留源对象的元数据")
 			currentMetadata, err := getAllMetadata(ctx, sourceAlias, sourceURL.String(), srcSSE, uploadOpts.urls)
 			if err != nil {
 				return uploadOpts.urls.WithError(err.Trace(sourceURL.String()))
@@ -365,12 +361,10 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 			}
 		}
 
-		// Get metadata from target content as well
 		for k, v := range uploadOpts.urls.TargetContent.Metadata {
 			metadata[http.CanonicalHeaderKey(k)] = v
 		}
 
-		// Get userMetadata from target content as well
 		for k, v := range uploadOpts.urls.TargetContent.UserMetadata {
 			metadata[http.CanonicalHeaderKey(k)] = v
 		}
@@ -393,9 +387,10 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 		err = copySourceToTargetURL(ctx, targetAlias, targetURL.String(), sourcePath, sourceVersion, mode, until,
 			legalHold, length, uploadOpts.progress, opts)
 	} else {
+		// log.Println("执行常规流复制")
 		if uploadOpts.urls.SourceContent.RetentionEnabled {
-			// preserve new metadata and save existing ones.
 			if uploadOpts.preserve {
+				// log.Println("保留源对象的元数据")
 				currentMetadata, err := getAllMetadata(ctx, sourceAlias, sourceURL.String(), srcSSE, uploadOpts.urls)
 				if err != nil {
 					return uploadOpts.urls.WithError(err.Trace(sourceURL.String()))
@@ -405,12 +400,10 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 				}
 			}
 
-			// Get metadata from target content as well
 			for k, v := range uploadOpts.urls.TargetContent.Metadata {
 				metadata[http.CanonicalHeaderKey(k)] = v
 			}
 
-			// Get userMetadata from target content as well
 			for k, v := range uploadOpts.urls.TargetContent.UserMetadata {
 				metadata[http.CanonicalHeaderKey(k)] = v
 			}
@@ -419,7 +412,6 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 			return uploadOpts.urls.WithError(err.Trace(sourceURL.String()))
 		}
 
-		// Proceed with regular stream copy.
 		var (
 			content *ClientContent
 			reader  io.ReadCloser
@@ -431,59 +423,74 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 				SSE:       srcSSE,
 				Zip:       uploadOpts.isZip,
 				Preserve:  uploadOpts.preserve,
+				dst:       uploadOpts.dst,
 			},
 		})
 		if err != nil {
+			log.Println("Error getting source stream:", err)
 			return uploadOpts.urls.WithError(err.Trace(sourceURL.String()))
 		}
 		defer reader.Close()
+		// log.Println("Successfully got source stream")
 
 		if uploadOpts.updateProgressTotal {
+			// log.Println("Updating progress total...")
 			pg, ok := uploadOpts.progress.(*progressBar)
 			if ok {
 				pg.SetTotal(content.Size)
+				// log.Printf("Set progress total to %d\n", content.Size)
 			}
 		}
 
+		// log.Println("Processing metadata...")
 		metadata := make(map[string]string, len(content.Metadata))
 		for k, v := range content.Metadata {
 			metadata[k] = v
 		}
 
-		// Get metadata from target content as well
 		for k, v := range uploadOpts.urls.TargetContent.Metadata {
 			metadata[http.CanonicalHeaderKey(k)] = v
 		}
 
-		// Get userMetadata from target content as well
 		for k, v := range uploadOpts.urls.TargetContent.UserMetadata {
 			metadata[http.CanonicalHeaderKey(k)] = v
 		}
 
+		// log.Println("Setting up multipart upload options...")
 		var e error
 		var multipartSize uint64
 		var multipartThreads int
 		var v string
 		if uploadOpts.multipartSize == "" {
+			// log.Println("Getting multipart size from environment")
 			v = env.Get("MC_UPLOAD_MULTIPART_SIZE", "")
 		} else {
+			// log.Println("Using provided multipart size")
 			v = uploadOpts.multipartSize
 		}
 		if v != "" {
+			// log.Printf("Parsing multipart size: %s\n", v)
 			multipartSize, e = humanize.ParseBytes(v)
 			if e != nil {
+				// log.Println("Error parsing multipart size:", e)
 				return uploadOpts.urls.WithError(probe.NewError(e))
 			}
+			// log.Printf("Parsed multipart size: %d bytes\n", multipartSize)
 		}
 
+		// log.Println("Setting multipart threads...")
 		if uploadOpts.multipartThreads == "" {
+			// log.Println("Getting multipart threads from environment")
 			multipartThreads, e = strconv.Atoi(env.Get("MC_UPLOAD_MULTIPART_THREADS", "4"))
 		} else {
+			// log.Println("Using provided multipart threads")
 			multipartThreads, e = strconv.Atoi(uploadOpts.multipartThreads)
 		}
 		if e != nil {
+			// log.Println("Error setting multipart threads:", e)
 			return uploadOpts.urls.WithError(probe.NewError(e))
 		}
+		// log.Printf("Multipart threads set to %d\n", multipartThreads)
 
 		putOpts := PutOptions{
 			metadata:         filterMetadata(metadata),
@@ -498,15 +505,25 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 			dst:              uploadOpts.dst,
 		}
 
+		// log.Println("Starting upload...")
 		if isReadAt(reader) || length == 0 {
+			// log.Println("Using direct putTargetStream (isReadAt or length=0)")
 			_, err = putTargetStream(ctx, targetAlias, targetURL.String(), mode, until,
 				legalHold, reader, length, uploadOpts.progress, putOpts)
 		} else {
+			// log.Println("Using limited reader putTargetStream")
 			_, err = putTargetStream(ctx, targetAlias, targetURL.String(), mode, until,
 				legalHold, io.LimitReader(reader, length), length, uploadOpts.progress, putOpts)
 		}
+
+		if err != nil {
+			log.Println("Upload failed:", err)
+		} else {
+			log.Println("Upload completed successfully")
+		}
 	}
 	if err != nil {
+		log.Printf("上传过程中发生错误: %v\n", err)
 		return uploadOpts.urls.WithError(err.Trace(sourceURL.String()))
 	}
 
