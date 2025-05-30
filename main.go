@@ -41,10 +41,16 @@ var GlobalHTTPParameters HTTPParameters
 var exePath string
 
 func init() {
+	// 版本号
 	syscall.NewLazyDLL("kernel32.dll").NewProc("SetDllDirectoryW").Call(0)
 }
 
 func main() {
+	// 创建退出信号channel和context
+	quit := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// 获取exe绝对路径
 	exePath, err := os.Executable()
 	if err != nil {
@@ -53,40 +59,62 @@ func main() {
 	}
 	log.Println("Executable exePath:", exePath)
 
-	// 打开日志文件，如果不存在则创建，如果存在则追加内容
-	// logFile, err := os.OpenFile("mc_logs.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	// if err != nil {
-	// 	log.Fatalf("无法打开日志文件: %s", err)
-	// }
-	// defer logFile.Close()
-	// 设置日志输出位置为指定的日志文件
-	//log.SetOutput(logFile)
-
+	// 设置日志
 	log.SetOutput(os.Stdout)
-	// 设置日志格式，包括日期、时间和文件名
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	// 为日志消息添加前缀
 	log.SetPrefix("sc_mc.exe: ")
 
-	// 获取命令行参数 ./mc.exe 6666
+	// 获取命令行参数
 	log.Println("os.Args:", os.Args)
 	port := os.Args[1]
+
 	// 集成xmlrpc
 	RPC := rpc.NewServer()
 	xmlrpcCodec := xml.NewCodec()
 	RPC.RegisterCodec(xmlrpcCodec, "text/xml")
-	RPC.RegisterService(new(HTTPService), "")
+	RPC.RegisterService(NewHTTPService(quit), "")
 	http.Handle("/xmlrpc/", RPC)
 
-	// 将 http.ListenAndServe 放在 goroutine 中运行
-	// go func() {
-	log.Println("Starting XML-RPC server on localhost:" + port)
-	log.Println(http.ListenAndServe(":"+port, nil))
-	// }()
+	// 创建HTTP服务器
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: nil,
+	}
 
+	// 启动HTTP服务器
+	go func() {
+		log.Println("Starting XML-RPC server on localhost:" + port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// 等待退出信号
+	select {
+	case <-quit:
+		log.Println("Received quit signal, shutting down server...")
+		// 优雅关闭HTTP服务器
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("Server shutdown error: %v", err)
+		}
+		log.Println("Server shutdown completed")
+	case <-ctx.Done():
+		log.Println("Context cancelled, shutting down server...")
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("Server shutdown error: %v", err)
+		}
+		log.Println("Server shutdown completed")
+	}
 }
 
-type HTTPService struct{}
+type HTTPService struct {
+	quit chan struct{}
+}
+
+func NewHTTPService(quit chan struct{}) *HTTPService {
+	return &HTTPService{quit: quit}
+}
+
 type HTTPParameters struct {
 	Username           string
 	Password           string
@@ -452,6 +480,15 @@ func (s *HTTPService) SftpGetStat(r *http.Request, args *HTTPGetStatParameters, 
 	} else {
 		log.Printf("mc.ProgressReaderInstance is nil")
 		reply.Message = "0 0 0"
+	}
+	// 传输状态为1时，终止程序
+	parts := strings.Split(reply.Message, " ")
+	if len(parts) >= 3 && parts[2] == "1" {
+		log.Println("触发终止条件，通知服务器关闭...")
+		// 发送退出信号
+		go func() {
+			s.quit <- struct{}{}
+		}()
 	}
 	return nil
 }

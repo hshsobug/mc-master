@@ -19,3 +19,4 @@ mc.exe
 
 sc_mc.exe
 *.syso
+.vs/

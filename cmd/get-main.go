@@ -20,7 +20,6 @@ package cmd
 import (
 	"context"
 	"log"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -164,10 +163,10 @@ func mainGet(cliCtx *cli.Context) (e error) {
 				dst:                 "/cdata/render-data/dataserver/" + args[len(args)-1] + sourcePath,
 			})
 			// 获取用户目录
-			userProfile := os.Getenv("userprofile")
-			// 构建目标路径
-			targetDir := filepath.Join(userProfile, "scc", "NewOKs")
-			targetPath := filepath.Join(targetDir, sourcePath)
+			// userProfile := os.Getenv("userprofile")
+			// targetDir := filepath.Join(userProfile, "scc", "NewOKs")
+			// 下载的目标路径与上传不同，直接在下载文件同名路径下
+			targetPath := filepath.Join(dst)
 			if urls.Error != nil {
 				// 下载失败
 				log.Println("doCopy urls.Error: ", urls.Error)
