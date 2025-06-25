@@ -347,6 +347,13 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 	// 接到新的传输请求，清零上传进度
 	mc.Finished = "0"
 	log.Printf("Received transfer parameters: %+v", args)
+	// 对特殊字符处理 &amp;转为&，&apos;转为'
+	args.Src = strings.ReplaceAll(args.Src, "&amp;", "&")
+	args.Src = strings.ReplaceAll(args.Src, "&apos;", "'")
+	args.Dst = strings.ReplaceAll(args.Dst, "&amp;", "&")
+	args.Dst = strings.ReplaceAll(args.Dst, "&apos;", "'")
+	log.Printf("Received transfer final parameters: %+v", args)
+
 	reply.Message = ""
 
 	// 创建新的上传任务后清零上传进度
