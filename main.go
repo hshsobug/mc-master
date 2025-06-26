@@ -233,7 +233,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 		BucketIsExists:     GlobalHTTPParameters.BucketIsExists,
 	}
 
-	// 打印新的结构体
+	// 打印接收参数
 	log.Printf("Received parameters: %+v", logParams)
 
 	// 为了匹配桶名规则，_转为-，大写转为小写
@@ -241,7 +241,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	GlobalHTTPParameters.Username = strings.ToLower(strings.ReplaceAll(GlobalHTTPParameters.Username, "_", "-"))
 	log.Println("finnal bucketName.", GlobalHTTPParameters.Username)
 
-	// 拼接字符串
+	// 生成新的别名
 	newAlias := fmt.Sprintf("%s_%s", GlobalHTTPParameters.Username, strings.ReplaceAll(GlobalHTTPParameters.Host, ".", "_"))
 
 	credentialMutex.Lock()
@@ -255,9 +255,6 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	}
 
 	// 生成7天有效期的STS凭证
-	// 获取可执行文件所在目录
-	// exeDir := filepath.Dir(exePath)
-	// policyPath := filepath.Join(exeDir, "policy.json")
 	params := STSCredentialParams{
 		STSEndpoint:       "http://" + args.Host + ":" + strconv.Itoa(args.Port),
 		LDAPUsername:      args.Username,
@@ -329,9 +326,6 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	}()
 	// }
 
-	// 6. 更新全局参数（保留原始凭证用于刷新）
-	// GlobalHTTPParameters = *args
-
 	return nil
 }
 
@@ -344,8 +338,7 @@ type HTTPTransferParameters struct {
 
 // SftpStartTransfer - 处理文件传输请求
 func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParameters, reply *HTTPResponse) error {
-	// 接到新的传输请求，清零上传进度
-	mc.Finished = "0"
+
 	log.Printf("Received transfer parameters: %+v", args)
 	// 对特殊字符处理 &amp;转为&，&apos;转为'
 	args.Src = strings.ReplaceAll(args.Src, "&amp;", "&")
@@ -356,7 +349,8 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 
 	reply.Message = ""
 
-	// 创建新的上传任务后清零上传进度
+	// 接到新的传输请求，清零上传进度
+	mc.Finished = "0"
 	mc.SuccessFileTotal = 0
 	mc.SuccessFileNum = 0
 
@@ -395,7 +389,7 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 			GlobalHTTPParameters.BucketIsExists = exists
 		} else {
 			log.Printf("Bucket %s does not exist\n", GlobalHTTPParameters.Username)
-			// 创建存储桶（新增代码）
+			// 创建存储桶
 			err = minioClient.MakeBucket(context.Background(), GlobalHTTPParameters.Username, minio.MakeBucketOptions{
 				Region: "us-east-1",
 			})
