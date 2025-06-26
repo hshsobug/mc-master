@@ -338,7 +338,6 @@ type HTTPTransferParameters struct {
 
 // SftpStartTransfer - 处理文件传输请求
 func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParameters, reply *HTTPResponse) error {
-
 	log.Printf("Received transfer parameters: %+v", args)
 	// 对特殊字符处理 &amp;转为&，&apos;转为'
 	args.Src = strings.ReplaceAll(args.Src, "&amp;", "&")
@@ -419,7 +418,7 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 		}
 	}
 
-	// 在这里处理文件传输逻辑
+	// 处理文件传输逻辑
 	// 根据args.Cmd的值（reput、put、reget、get）来决定是上传还是下载
 	// args.Src和args.Dst分别表示源文件和目标文件
 	// 多个文件用 | 隔开，可以根据需要分割字符串来处理多个文件
