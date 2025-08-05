@@ -115,6 +115,8 @@ var Finished = "0"
 var Alias string
 var Url string
 
+var lastSuccessFileTotal int64
+
 // mainPut is the entry point for put command.
 func mainPut(cliCtx *cli.Context) (e error) {
 	args := cliCtx.Args()
@@ -360,7 +362,6 @@ func showLastProgressBar(pg ProgressReader, e error) {
 		progressReader.Finish()
 	} else {
 		if accntReader, ok := pg.(*minio.Accounter); ok {
-			// log.Println("showLastProgressBar accntReader.Stat()!!!")
 			printMsg(accntReader.Stat())
 		}
 	}
@@ -377,16 +378,23 @@ func GetProgressStr(pg ProgressReader) string {
 			Finished = "1"
 		}
 		var result string
+		var nowSuccessFileTotal int64
 		select {
 		case <-accntReader.IsFinished:
+			nowSuccessFileTotal = SuccessFileTotal
 			// 通道已关闭，表示操作已完成
 			result = strconv.Itoa(int(math.Round(accntReader.GetSpeed()))) + " " + strconv.FormatInt(SuccessFileTotal, 10) + " " + Finished
 		default:
 			// 通道未关闭，表示操作仍在进行
 			log.Println("Operation is still ongoing")
+			nowSuccessFileTotal = SuccessFileTotal + accntReader.Get()
 			result = strconv.Itoa(int(math.Round(accntReader.GetSpeed()))) + " " + strconv.FormatInt(SuccessFileTotal+accntReader.Get(), 10) + " " + Finished
 		}
 		// result := strconv.Itoa(int(math.Round(achhhhcntReader.GetSpeed()))) + " " + strconv.FormatInt(accntReader.Get(), 10) + " " + finished
+		if nowSuccessFileTotal == lastSuccessFileTotal && accntReader.GetSpeed() != 0 {
+			accntReader.Update()
+		}
+		lastSuccessFileTotal = nowSuccessFileTotal
 		log.Println("ShowProgressReader accntReader result:", result)
 		return result
 	} else {
