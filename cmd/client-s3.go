@@ -895,6 +895,9 @@ func (c *S3Client) Get(ctx context.Context, opts GetOptions) (io.ReadCloser, *Cl
 	// Disallow automatic decompression for some objects with content-encoding set.
 	o.Set("Accept-Encoding", "identity")
 
+	//sobug
+	o.Dst = opts.dst
+
 	cr := minio.Core{Client: c.api}
 	reader, objectInfo, _, e := cr.GetObject(ctx, bucket, object, o)
 	if e != nil {

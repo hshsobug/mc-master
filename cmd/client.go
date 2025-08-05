@@ -62,6 +62,8 @@ type GetOptions struct {
 	RangeStart int64
 	PartNumber int
 	Preserve   bool
+	// sobug 增加目标路径属性
+	dst string
 }
 
 // PutOptions holds options for PUT operation

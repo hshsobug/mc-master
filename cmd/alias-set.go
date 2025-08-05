@@ -160,12 +160,6 @@ func checkAliasSetSyntax(ctx *cli.Context, accessKey, secretKey string, deprecat
 
 // setAlias - set an alias config.
 func setAlias(alias string, aliasCfgV10 aliasConfigV10) aliasMessage {
-	// sobug 解密
-	// if err := quick.DecryptFile(mustGetMcConfigPath()); err != nil {
-	// 	log.Panicln("decryptFile the alias config file error.", err)
-	// }
-	// defer quick.EncryptFile(mustGetMcConfigPath()) // 重新加密
-
 	mcCfgV10, err := loadMcConfig()
 	fatalIf(err.Trace(globalMCConfigVersion), "Unable to load config `"+mustGetMcConfigPath()+"`.")
 
@@ -174,11 +168,6 @@ func setAlias(alias string, aliasCfgV10 aliasConfigV10) aliasMessage {
 
 	err = saveMcConfig(mcCfgV10)
 	fatalIf(err.Trace(alias), "Unable to update hosts in config version `"+mustGetMcConfigPath()+"`.")
-
-	// sobug 加密
-	// if err := quick.EncryptFile(mustGetMcConfigPath()); err != nil {
-	// 	fatalIf(probe.NewError(err), "配置文件加密失败")
-	// }
 
 	return aliasMessage{
 		Alias:     alias,

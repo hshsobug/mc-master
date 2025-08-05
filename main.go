@@ -26,6 +26,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/divan/gorilla-xmlrpc/xml"
@@ -39,7 +40,17 @@ import (
 var GlobalHTTPParameters HTTPParameters
 var exePath string
 
+func init() {
+	// 版本号
+	syscall.NewLazyDLL("kernel32.dll").NewProc("SetDllDirectoryW").Call(0)
+}
+
 func main() {
+	// 创建退出信号channel和context
+	quit := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// 获取exe绝对路径
 	exePath, err := os.Executable()
 	if err != nil {
@@ -48,40 +59,62 @@ func main() {
 	}
 	log.Println("Executable exePath:", exePath)
 
-	// 打开日志文件，如果不存在则创建，如果存在则追加内容
-	// logFile, err := os.OpenFile("mc_logs.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	// if err != nil {
-	// 	log.Fatalf("无法打开日志文件: %s", err)
-	// }
-	// defer logFile.Close()
-	// 设置日志输出位置为指定的日志文件
-	//log.SetOutput(logFile)
-
+	// 设置日志
 	log.SetOutput(os.Stdout)
-	// 设置日志格式，包括日期、时间和文件名
 	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-	// 为日志消息添加前缀
 	log.SetPrefix("sc_mc.exe: ")
 
-	// 获取命令行参数 ./mc.exe 6666
+	// 获取命令行参数
 	log.Println("os.Args:", os.Args)
 	port := os.Args[1]
+
 	// 集成xmlrpc
 	RPC := rpc.NewServer()
 	xmlrpcCodec := xml.NewCodec()
 	RPC.RegisterCodec(xmlrpcCodec, "text/xml")
-	RPC.RegisterService(new(HTTPService), "")
+	RPC.RegisterService(NewHTTPService(quit), "")
 	http.Handle("/xmlrpc/", RPC)
 
-	// 将 http.ListenAndServe 放在 goroutine 中运行
-	// go func() {
-	log.Println("Starting XML-RPC server on localhost:" + port)
-	log.Println(http.ListenAndServe(":"+port, nil))
-	// }()
+	// 创建HTTP服务器
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: nil,
+	}
 
+	// 启动HTTP服务器
+	go func() {
+		log.Println("Starting XML-RPC server on localhost:" + port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
+		}
+	}()
+
+	// 等待退出信号
+	select {
+	case <-quit:
+		log.Println("Received quit signal, shutting down server...")
+		// 优雅关闭HTTP服务器
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("Server shutdown error: %v", err)
+		}
+		log.Println("Server shutdown completed")
+	case <-ctx.Done():
+		log.Println("Context cancelled, shutting down server...")
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("Server shutdown error: %v", err)
+		}
+		log.Println("Server shutdown completed")
+	}
 }
 
-type HTTPService struct{}
+type HTTPService struct {
+	quit chan struct{}
+}
+
+func NewHTTPService(quit chan struct{}) *HTTPService {
+	return &HTTPService{quit: quit}
+}
+
 type HTTPParameters struct {
 	Username           string
 	Password           string
@@ -200,7 +233,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 		BucketIsExists:     GlobalHTTPParameters.BucketIsExists,
 	}
 
-	// 打印新的结构体
+	// 打印接收参数
 	log.Printf("Received parameters: %+v", logParams)
 
 	// 为了匹配桶名规则，_转为-，大写转为小写
@@ -208,7 +241,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	GlobalHTTPParameters.Username = strings.ToLower(strings.ReplaceAll(GlobalHTTPParameters.Username, "_", "-"))
 	log.Println("finnal bucketName.", GlobalHTTPParameters.Username)
 
-	// 拼接字符串
+	// 生成新的别名
 	newAlias := fmt.Sprintf("%s_%s", GlobalHTTPParameters.Username, strings.ReplaceAll(GlobalHTTPParameters.Host, ".", "_"))
 
 	credentialMutex.Lock()
@@ -222,9 +255,6 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	}
 
 	// 生成7天有效期的STS凭证
-	// 获取可执行文件所在目录
-	// exeDir := filepath.Dir(exePath)
-	// policyPath := filepath.Join(exeDir, "policy.json")
 	params := STSCredentialParams{
 		STSEndpoint:       "http://" + args.Host + ":" + strconv.Itoa(args.Port),
 		LDAPUsername:      args.Username,
@@ -296,9 +326,6 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	}()
 	// }
 
-	// 6. 更新全局参数（保留原始凭证用于刷新）
-	// GlobalHTTPParameters = *args
-
 	return nil
 }
 
@@ -312,16 +339,19 @@ type HTTPTransferParameters struct {
 // SftpStartTransfer - 处理文件传输请求
 func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParameters, reply *HTTPResponse) error {
 	log.Printf("Received transfer parameters: %+v", args)
+	// 对特殊字符处理 &amp;转为&，&apos;转为'
+	args.Src = strings.ReplaceAll(args.Src, "&amp;", "&")
+	args.Src = strings.ReplaceAll(args.Src, "&apos;", "'")
+	args.Dst = strings.ReplaceAll(args.Dst, "&amp;", "&")
+	args.Dst = strings.ReplaceAll(args.Dst, "&apos;", "'")
+	log.Printf("Received transfer final parameters: %+v", args)
+
 	reply.Message = ""
 
-	// 创建新的上传任务后清零上传进度
+	// 接到新的传输请求，清零上传进度
+	mc.Finished = "0"
 	mc.SuccessFileTotal = 0
 	mc.SuccessFileNum = 0
-
-	// 在这里处理文件传输逻辑
-	// 根据args.Cmd的值（reput、put、reget、get）来决定是上传还是下载
-	// args.Src和args.Dst分别表示源文件和目标文件
-	// 多个文件用 | 隔开，可以根据需要分割字符串来处理多个文件
 
 	credentialMutex.Lock()
 	endpoint := GlobalHTTPParameters.Host + ":" + strconv.Itoa(GlobalHTTPParameters.Port)
@@ -339,7 +369,9 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 		Secure: useSSL,
 	})
 	if err != nil {
-		log.Println(err)
+		log.Println("初始化minio客户端对象失败:", err)
+		reply.Message = fmt.Sprintf("初始化minio客户端对象失败: %v", err.Error())
+		return nil
 	}
 
 	// 上传前检查桶名是否存在，不存在则创建
@@ -347,29 +379,16 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 		// 检查bucket是否存在
 		exists, err := minioClient.BucketExists(context.Background(), GlobalHTTPParameters.Username)
 		if err != nil {
-			log.Println("minio BucketExists error.", err)
+			log.Println("BucketExists检查失败:", err)
+			reply.Message = fmt.Sprintf("存储桶状态检查失败: %v", err.Error())
+			return nil
 		}
 		if exists {
 			log.Printf("Bucket %s already exists\n", GlobalHTTPParameters.Username)
 			GlobalHTTPParameters.BucketIsExists = exists
 		} else {
 			log.Printf("Bucket %s does not exist\n", GlobalHTTPParameters.Username)
-			//bucket := "minio-server/" + GlobalHTTPParameters.Username
-			// os.Setenv("MC_STS_TOKEN", credentialCache.SessionToken)
-			// mbParams := []string{
-			// 	exePath, "mb", bucket,
-			// }
-
-			// log.Println("minio mb " + bucket)
-			// if e := mc.Main(mbParams); e != nil {
-			// 	reply.Message = e.Error()
-			// 	log.Println("minio mb error.", e)
-			// } else {
-			// 	log.Println("minio mb success.")
-			// 	GlobalHTTPParameters.BucketIsExists = true
-			// }
-
-			// 创建存储桶（新增代码）
+			// 创建存储桶
 			err = minioClient.MakeBucket(context.Background(), GlobalHTTPParameters.Username, minio.MakeBucketOptions{
 				Region: "us-east-1",
 			})
@@ -379,7 +398,7 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 				exists, err := minioClient.BucketExists(context.Background(), GlobalHTTPParameters.Username)
 				if err != nil {
 					log.Println("BucketExists检查失败:", err)
-					reply.Message = fmt.Sprintf("存储桶状态检查失败: %v", err)
+					reply.Message = fmt.Sprintf("存储桶状态检查失败: %v", err.Error())
 					return nil
 				}
 				if exists {
@@ -388,7 +407,8 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 					reply.Message = ""
 				} else {
 					reply.Message = fmt.Sprintf("创建存储桶失败: %v", err)
-					log.Println("minioClient.MakeBucket error:", err)
+					log.Println("minioClient.MakeBucket error:", err.Error())
+					return nil
 				}
 			} else {
 				log.Printf("Bucket %s 创建成功\n", GlobalHTTPParameters.Username)
@@ -398,67 +418,52 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 		}
 	}
 
-	// 示例：打印参数并返回成功消息
-	cmds := strings.Split(args.Cmd, "|")
+	// 处理文件传输逻辑
+	// 根据args.Cmd的值（reput、put、reget、get）来决定是上传还是下载
+	// args.Src和args.Dst分别表示源文件和目标文件
+	// 多个文件用 | 隔开，可以根据需要分割字符串来处理多个文件
+	cmd := args.Cmd
 	srcs := strings.Split(args.Src, "|")
 	dsts := strings.Split(args.Dst, "|")
-	log.Printf("Cmds: %v, Srcs: %v, Dsts: %v", cmds, srcs, dsts)
+	// log.Printf("cmd: %v, Srcs: %v, Dsts: %v", cmd, srcs, dsts)
 	// 检查cmds、srcs和dsts的长度是否相等
 	if len(srcs) != len(dsts) {
 		reply.Message = "The number of source files, and destination paths must be the same."
 		return nil
 	}
 	mc.AllFileNum = int64(len(srcs))
-	// 目前只支持 put
-	cmds[0] = "put"
-	// sobug 单个文件
-	// go func() {
-	// 	// 另起线程提交上传任务
-	// 	uploadParams := []string{exePath, cmds[0], srcs[0], dsts[0], GlobalHTTPParameters.Username, realUserName}
-	// 	if e := mc.Main(uploadParams); e != nil {
-	// 		log.Println("Main upload error.", e)
-	// 		reply.Message = e.Error()
-	// 	} else {
-	// 		log.Println("Main upload success.")
-	// 	}
-	// }()
-	// 启动多个协程并发上传文件
+	// 启动后台程序
 	go func() {
-		for index := range srcs {
-			// 检查文件已上传成功不再上传
-			// // 获取用户目录
-			// userProfile := os.Getenv("userprofile")
-			// // 构建目标路径
-			// targetDir := filepath.Join(userProfile, "scc", "NewOKs")
-			// targetPath := filepath.Join(targetDir, dsts[index])
-			// // 检查文件是否存在
-			// if _, err := os.Stat(targetPath); err == nil {
-			// 	log.Printf("Success File %s already exists.", targetPath)
-			// 	fileInfo, err := os.Stat(srcs[index])
-			// 	if err != nil {
-			// 		if os.IsNotExist(err) {
-			// 			log.Fatalf("File does not exist: %s", srcs[index])
-			// 		} else {
-			// 			log.Fatalf("Error getting file info: %v", err)
-			// 		}
-			// 	}
-			// 	mc.SuccessFileTotal += fileInfo.Size()
-			// 	mc.SuccessFileNum++
-			// 	continue
-			// }
-			// 构建上传命令的参数列表
-			// 设置环境变量传递 SessionToken
-			uploadParams := []string{exePath, cmds[0], srcs[index], dsts[index], GlobalHTTPParameters.Username, realUserName}
-
-			if e := mc.Main(uploadParams); e != nil {
-				log.Printf("Main upload error for %s: %v", srcs[index], e)
-				reply.Message = e.Error()
-			} else {
-				log.Printf("Main upload success for %s", srcs[index])
+		if cmd == "put" || cmd == "reput" {
+			// 上传
+			for index := range srcs {
+				// 构建上传命令的参数列表
+				uploadParams := []string{exePath, "put", srcs[index], dsts[index], GlobalHTTPParameters.Username, realUserName}
+				if e := mc.Main(uploadParams); e != nil {
+					log.Printf("Main upload error for %s: %v", srcs[index], e)
+					reply.Message = e.Error()
+				} else {
+					log.Printf("Main upload success for %s", srcs[index])
+				}
 			}
+		} else if cmd == "get" || cmd == "reget" {
+			// 下载
+			for index := range srcs {
+				// 构建下载命令的参数列表
+				downloadParams := []string{exePath, "get", srcs[index], dsts[index], GlobalHTTPParameters.Username, realUserName}
+				// downloadParams := []string{exePath, "get", srcs[index], dsts[index]}
+				if e := mc.Main(downloadParams); e != nil {
+					log.Printf("Main download error for %s: %v", srcs[index], e)
+					reply.Message = e.Error()
+				} else {
+					log.Printf("Main download success for %s", srcs[index])
+				}
+			}
+		} else {
+			log.Printf("cmd: %v is not supported.", cmd)
 		}
-	}()
 
+	}()
 	return nil
 }
 
@@ -476,13 +481,24 @@ func (s *HTTPService) SftpGetStat(r *http.Request, args *HTTPGetStatParameters, 
 		log.Printf("mc.ProgressReaderInstance is nil")
 		reply.Message = "0 0 0"
 	}
+	// 传输状态为1时，终止程序
+	parts := strings.Split(reply.Message, " ")
+	if len(parts) >= 3 && parts[2] == "1" {
+		log.Println("触发终止条件，通知服务器关闭...")
+		// 发送退出信号
+		go func() {
+			s.quit <- struct{}{}
+		}()
+	}
 	return nil
 }
 
 // SftpStopTransfer - 停止传输
 func (s *HTTPService) SftpStopTransfer(r *http.Request, args *HTTPGetStatParameters, reply *HTTPResponse) error {
 	log.Printf("Received SftpStopTransfer parameters: %+v", args)
-	mc.CancelFilePut() // 停止传输
+	// 停止传输
+	mc.CancelFilePut()
+	mc.CancelFileGet()
 	reply.Message = ""
 	return nil
 }
