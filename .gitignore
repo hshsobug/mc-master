@@ -8,15 +8,14 @@ coverage.txt
 parts/
 prime/
 stage/
-mc
 .run*
 .idea/
 mc.RELEASE*
 mc.gz
 .DS_Store
 .vscode/
-mc.exe
 
-sc_mc.exe
+
+*.exe
 *.syso
 .vs/
