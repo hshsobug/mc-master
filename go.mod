@@ -1,8 +1,6 @@
 module github.com/minio/mc
 
-go 1.23
-
-toolchain go1.23.0
+go 1.20
 
 require (
 	github.com/charmbracelet/bubbles v0.19.0
@@ -23,11 +21,11 @@ require (
 	github.com/mattn/go-ieproxy v0.0.12
 	github.com/mattn/go-isatty v0.0.20
 	github.com/minio/cli v1.24.2
-	github.com/minio/colorjson v1.0.8
+	github.com/minio/colorjson v1.0.6
 	github.com/minio/filepath v1.0.0
 	github.com/minio/madmin-go/v3 v3.0.64
 	github.com/minio/minio-go/v7 v7.0.76
-	github.com/minio/pkg/v3 v3.0.13
+	github.com/minio/pkg/v3 v3.0.0-00010101000000-000000000000
 	github.com/minio/selfupdate v0.6.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/muesli/reflow v0.3.0
@@ -69,6 +67,7 @@ require (
 	github.com/goccy/go-json v0.10.4 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
@@ -88,6 +87,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/mux v1.9.0 // indirect
+	github.com/minio/pkg/v2 v2.0.1 // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
@@ -97,7 +97,7 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/prom2json v1.4.0 // indirect
-	github.com/prometheus/prometheus v0.54.0 // indirect
+	github.com/prometheus/prometheus v0.53.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-charset v0.0.0-20190617161244-0dc95cdf6f31 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
@@ -131,3 +131,7 @@ replace github.com/cheggaaa/pb => E:\vscode_workspace\pb@v1.0.29
 replace github.com/divan/gorilla-xmlrpc/xml => E:\vscode_workspace\gorilla-xmlrpc
 
 replace github.com/minio/pkg/v3 => E:\vscode_workspace\pkg-v3@v3.0.13
+
+replace github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.1
+
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.40.7

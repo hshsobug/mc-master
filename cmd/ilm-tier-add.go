@@ -20,7 +20,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/fatih/color"
@@ -255,7 +254,7 @@ func fetchTierConfig(ctx *cli.Context, tierName string, tierType madmin.TierType
 
 		s3SC := ctx.String("storage-class")
 		if s3SC != "" {
-			if !slices.Contains(supportedAWSTierSC, s3SC) {
+			if !contains(supportedAWSTierSC, s3SC) {
 				fatalIf(errInvalidArgument().Trace(), fmt.Sprintf("unsupported storage-class type %s", s3SC))
 			}
 			s3Opts = append(s3Opts, madmin.S3StorageClass(s3SC))

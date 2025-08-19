@@ -18,7 +18,6 @@
 package cmd
 
 import (
-	"cmp"
 	"fmt"
 	"sort"
 	"strings"
@@ -206,21 +205,21 @@ func sortDriveIOStat(sortBy drivesSorter, asc bool, data []driveIOStat) {
 		c := 0
 		switch sortBy {
 		case sortByName:
-			c = cmp.Compare(data[i].endpoint, data[j].endpoint)
+			c = compare(data[i].endpoint, data[j].endpoint)
 		case sortByUsed:
-			c = cmp.Compare(data[i].used, data[j].used)
+			c = compare(data[i].used, data[j].used)
 		case sortByAwait:
-			c = cmp.Compare(data[i].await, data[j].await)
+			c = compare(data[i].await, data[j].await)
 		case sortByUtil:
-			c = cmp.Compare(data[i].util, data[j].util)
+			c = compare(data[i].util, data[j].util)
 		case sortByRead:
-			c = cmp.Compare(data[i].readMBs, data[j].readMBs)
+			c = compare(data[i].readMBs, data[j].readMBs)
 		case sortByWrite:
-			c = cmp.Compare(data[i].writeMBs, data[j].writeMBs)
+			c = compare(data[i].writeMBs, data[j].writeMBs)
 		case sortByDiscard:
-			c = cmp.Compare(data[i].discardMBs, data[j].discardMBs)
+			c = compare(data[i].discardMBs, data[j].discardMBs)
 		case sortByTps:
-			c = cmp.Compare(data[i].tps, data[j].tps)
+			c = compare(data[i].tps, data[j].tps)
 		}
 
 		less := c < 0

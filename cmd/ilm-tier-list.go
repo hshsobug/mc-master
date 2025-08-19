@@ -18,9 +18,8 @@
 package cmd
 
 import (
-	"cmp"
 	"fmt"
-	"slices"
+	"sort"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -119,8 +118,8 @@ func mainAdminTierList(ctx *cli.Context) error {
 	}
 
 	tableData := tierTable(tiers)
-	slices.SortFunc(tableData, func(a, b *madmin.TierConfig) int {
-		return cmp.Compare(a.Name, b.Name)
+	sort.Slice(tableData, func(i, j int) bool {
+		return tableData[i].Name < tableData[j].Name
 	})
 	tbl := table.New().
 		Border(lipgloss.NormalBorder()).
