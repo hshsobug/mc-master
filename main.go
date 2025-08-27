@@ -215,6 +215,9 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	reply.Message = ""
 	// 更新设置变量,重置设置标志
 	GlobalHTTPParameters = *args
+
+	// 测试开启
+	log.Printf("Received args: %+v", args)
 	// 创建一个新的结构体，将敏感字段替换为*
 	logParams := HTTPParametersLog{
 		Username:           GlobalHTTPParameters.Username,
@@ -374,6 +377,13 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 		return nil
 	}
 
+	// 确保minioClient不为nil
+	if minioClient == nil {
+		log.Println("minioClient初始化失败，对象为nil")
+		reply.Message = "minioClient初始化失败，对象为nil"
+		return nil
+	}
+
 	// 上传前检查桶名是否存在，不存在则创建
 	if !GlobalHTTPParameters.BucketIsExists {
 		// 检查bucket是否存在
@@ -407,7 +417,7 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 					reply.Message = ""
 				} else {
 					reply.Message = fmt.Sprintf("创建存储桶失败: %v", err)
-					log.Println("minioClient.MakeBucket error:", err.Error())
+					log.Println("minioClient.MakeBucket error:", err)
 					return nil
 				}
 			} else {
@@ -434,7 +444,8 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 	mc.AllFileNum = int64(len(srcs))
 	// 启动后台程序
 	go func() {
-		if cmd == "put" || cmd == "reput" {
+		switch cmd {
+		case "put", "reput":
 			// 上传
 			for index := range srcs {
 				// 构建上传命令的参数列表
@@ -446,7 +457,7 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 					log.Printf("Main upload success for %s", srcs[index])
 				}
 			}
-		} else if cmd == "get" || cmd == "reget" {
+		case "get", "reget":
 			// 下载
 			for index := range srcs {
 				// 构建下载命令的参数列表
@@ -459,10 +470,9 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 					log.Printf("Main download success for %s", srcs[index])
 				}
 			}
-		} else {
+		default:
 			log.Printf("cmd: %v is not supported.", cmd)
 		}
-
 	}()
 	return nil
 }
