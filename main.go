@@ -216,8 +216,6 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	// 更新设置变量,重置设置标志
 	GlobalHTTPParameters = *args
 
-	// 测试开启
-	log.Printf("Received args: %+v", args)
 	// 创建一个新的结构体，将敏感字段替换为*
 	logParams := HTTPParametersLog{
 		Username:           GlobalHTTPParameters.Username,

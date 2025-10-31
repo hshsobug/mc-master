@@ -130,12 +130,16 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	ctx, CancelPut = context.WithCancel(globalContext)
 	defer CancelPut()
 
+	log.Printf("mc put-main.go mainPut cliCtx.String.", cliCtx.String("s"))
 	// part size
 	size := cliCtx.String("s")
 	if size == "" {
 		size = "32MiB"
 	}
 
+	// 改为300
+	// size = "300MiB"
+	log.Printf("mc put-main.go mainPut size:%+v", size)
 	_, perr := humanize.ParseBytes(size)
 	if perr != nil {
 		fatalIf(probe.NewError(perr), "Unable to parse part size")
