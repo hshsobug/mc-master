@@ -137,9 +137,8 @@ func mainPut(cliCtx *cli.Context) (e error) {
 		size = "32MiB"
 	}
 
-	// 改为300
-	// size = "300MiB"
-	log.Printf("mc put-main.go mainPut size:%+v", size)
+	defaultSize := size
+	log.Printf("mc put-main.go mainPut defaultSize:%+v", defaultSize)
 	_, perr := humanize.ParseBytes(size)
 	if perr != nil {
 		fatalIf(probe.NewError(perr), "Unable to parse part size")
@@ -217,6 +216,10 @@ func mainPut(cliCtx *cli.Context) (e error) {
 		}
 		close(putURLsCh)
 	}()
+
+	firstFile := true
+	var dynamicPartSize string
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -232,6 +235,19 @@ func mainPut(cliCtx *cli.Context) (e error) {
 				showLastProgressBar(pg, putURLs.Error.ToGoError())
 				Finished = "1"
 				return
+			}
+			// 如果是第一个文件，根据文件大小动态计算分片大小
+			if firstFile {
+				fileSize := putURLs.SourceContent.Size
+				dynamicPartSize = calculateDynamicPartSize(fileSize)
+				firstFile = false
+				log.Printf("使用动态计算的分片大小: %s", dynamicPartSize)
+			}
+
+			// 使用动态计算的分片大小
+			finalPartSize := dynamicPartSize
+			if finalPartSize == "" {
+				finalPartSize = defaultSize
 			}
 			urls := doCopy(ctx, doCopyOpts{
 				cpURLs:           putURLs,
@@ -406,4 +422,62 @@ func GetProgressStr(pg ProgressReader) string {
 
 func CancelFilePut() {
 	CancelPut()
+}
+
+// 动态计算分片大小的函数
+func calculateDynamicPartSize(fileSize int64) string {
+	// 最小分片大小 16MiB
+	minPartSize := int64(16 * 1024 * 1024) // 16MiB
+	// 最大分片数量
+	maxParts := 10000
+
+	// 计算理论最小分片大小
+	theoreticalMinPartSize := fileSize / int64(maxParts)
+	if theoreticalMinPartSize < minPartSize {
+		theoreticalMinPartSize = minPartSize
+	}
+
+	// 向上取整到最近的2的幂次方（16, 32, 64, 128, 256, 512 MiB等）
+	var partSize int64
+	switch {
+	case theoreticalMinPartSize <= 16*1024*1024: // 16MiB
+		partSize = 16 * 1024 * 1024
+	case theoreticalMinPartSize <= 32*1024*1024: // 32MiB
+		partSize = 32 * 1024 * 1024
+	case theoreticalMinPartSize <= 64*1024*1024: // 64MiB
+		partSize = 64 * 1024 * 1024
+	case theoreticalMinPartSize <= 128*1024*1024: // 128MiB
+		partSize = 128 * 1024 * 1024
+	case theoreticalMinPartSize <= 256*1024*1024: // 256MiB
+		partSize = 256 * 1024 * 1024
+	case theoreticalMinPartSize <= 512*1024*1024: // 512MiB
+		partSize = 512 * 1024 * 1024
+	default: // 超过512MiB，使用1GiB
+		partSize = 1024 * 1024 * 1024
+	}
+
+	// 确保分片数量不超过最大值
+	actualParts := (fileSize + partSize - 1) / partSize // 向上取整
+	if actualParts > int64(maxParts) {
+		// 如果还是超过，使用更大的分片大小
+		partSize = (fileSize + int64(maxParts) - 1) / int64(maxParts) // 计算最小需要的分片大小
+		// 向上对齐到16MiB的倍数
+		partSize = ((partSize + 16*1024*1024 - 1) / (16 * 1024 * 1024)) * (16 * 1024 * 1024)
+	}
+
+	// 转换为人类可读的字符串
+	var sizeStr string
+	switch {
+	case partSize < 1024*1024:
+		sizeStr = fmt.Sprintf("%dKiB", partSize/1024)
+	case partSize < 1024*1024*1024:
+		sizeStr = fmt.Sprintf("%dMiB", partSize/(1024*1024))
+	default:
+		sizeStr = fmt.Sprintf("%dGiB", partSize/(1024*1024*1024))
+	}
+
+	log.Printf("动态计算分片大小: 文件大小=%d, 分片大小=%s, 预计分片数=%d",
+		fileSize, sizeStr, (fileSize+partSize-1)/partSize)
+
+	return sizeStr
 }
