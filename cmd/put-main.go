@@ -20,6 +20,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/dustin/go-humanize"
 	"github.com/minio/cli"
+	json "github.com/minio/colorjson"
 	"github.com/minio/mc/pkg/probe"
 	"github.com/minio/pkg/v3/console"
 
@@ -130,7 +132,6 @@ func mainPut(cliCtx *cli.Context) (e error) {
 	ctx, CancelPut = context.WithCancel(globalContext)
 	defer CancelPut()
 
-	log.Printf("mc put-main.go mainPut cliCtx.String.", cliCtx.String("s"))
 	// part size
 	size := cliCtx.String("s")
 	if size == "" {
@@ -144,7 +145,7 @@ func mainPut(cliCtx *cli.Context) (e error) {
 		fatalIf(probe.NewError(perr), "Unable to parse part size")
 	}
 	// threads
-	threads := cliCtx.Int("P")
+	threads := getThreadCount(cliCtx)
 	if threads < 1 {
 		fatalIf(errInvalidArgument().Trace(strconv.Itoa(threads)), "Invalid number of threads")
 	}
@@ -253,10 +254,11 @@ func mainPut(cliCtx *cli.Context) (e error) {
 				cpURLs:           putURLs,
 				pg:               pg,
 				encryptionKeys:   encryptionKeys,
-				multipartSize:    size,
+				multipartSize:    finalPartSize,
 				multipartThreads: strconv.Itoa(threads),
 				ifNotExists:      cliCtx.Bool("if-not-exists"),
 				dst:              "/cdata/render-data/dataserver/" + args[len(args)-1] + dst,
+				fileModTime:      putURLs.SourceContent.Time,
 			})
 
 			// 获取用户目录
@@ -480,4 +482,105 @@ func calculateDynamicPartSize(fileSize int64) string {
 		fileSize, sizeStr, (fileSize+partSize-1)/partSize)
 
 	return sizeStr
+}
+
+// 配置文件结构
+type ScmcConfig struct {
+	Threads int `json:"threads"`
+	// 可以添加其他配置字段
+}
+
+// 获取配置文件路径
+func getConfigPath() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Printf("Warning: failed to get user home directory, using current directory: %v", err)
+		return "config.json"
+	}
+	return filepath.Join(homeDir, "SCC", "scmc", "config.json")
+}
+
+// 读取配置文件
+func readConfig() (*ScmcConfig, error) {
+	configPath := getConfigPath()
+
+	// 检查配置文件是否存在
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// 如果配置文件不存在，创建默认配置
+		if createErr := createDefaultConfig(); createErr != nil {
+			log.Printf("Failed to create default config: %v", createErr)
+		}
+	}
+
+	// 读取文件
+	data, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %v", err)
+	}
+
+	// 解析JSON
+	var config ScmcConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %v", err)
+	}
+
+	return &config, nil
+}
+
+// 创建默认配置文件（如果不存在）
+func createDefaultConfig() error {
+	configPath := getConfigPath()
+
+	// 确保目录存在
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %v", dir, err)
+	}
+
+	// 创建默认配置
+	defaultConfig := ScmcConfig{
+		Threads: 4, // 默认线程数
+	}
+
+	data, err := json.MarshalIndent(defaultConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal default config: %v", err)
+	}
+
+	if err := ioutil.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write default config: %v", err)
+	}
+
+	log.Printf("Created default config file at: %s", configPath)
+	return nil
+}
+
+// 获取线程数（优先从配置文件读取，失败则使用命令行参数）
+func getThreadCount(cliCtx *cli.Context) int {
+	// 首先尝试从配置文件读取
+	config, err := readConfig()
+	if err != nil {
+		log.Printf("Warning: failed to read config file, using command line argument: %v", err)
+
+		// 回退到命令行参数
+		return getThreadsFromCLI(cliCtx)
+	}
+
+	// 检查配置文件中的线程数是否有效
+	if config.Threads < 1 {
+		log.Printf("Warning: invalid threads count in config file: %d, using command line argument", config.Threads)
+		return getThreadsFromCLI(cliCtx)
+	}
+
+	log.Printf("Using thread count from config file: %d", config.Threads)
+	return config.Threads
+}
+
+// 从命令行参数获取线程数（原有逻辑）
+func getThreadsFromCLI(cliCtx *cli.Context) int {
+	threads := cliCtx.Int("P")
+	if threads < 1 {
+		fatalIf(errInvalidArgument().Trace(strconv.Itoa(threads)), "Invalid number of threads")
+	}
+	return threads
 }

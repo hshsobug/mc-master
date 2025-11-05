@@ -79,6 +79,8 @@ type PutOptions struct {
 	ifNotExists           bool
 	// sobug 增加目标路径属性
 	dst string
+	// sobug 增加文件最终修改时间
+	fileModTime time.Time
 }
 
 // StatOptions holds options of the HEAD operation

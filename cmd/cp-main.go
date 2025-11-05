@@ -25,6 +25,7 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/minio/cli"
@@ -268,6 +269,7 @@ func doCopy(ctx context.Context, copyOpts doCopyOpts) URLs {
 		updateProgressTotal: copyOpts.updateProgressTotal,
 		ifNotExists:         copyOpts.ifNotExists,
 		dst:                 copyOpts.dst,
+		fileModTime:         copyOpts.fileModTime,
 	})
 	if copyOpts.isMvCmd && urls.Error == nil {
 		rmManager.add(ctx, sourceAlias, sourceURL.String())
@@ -566,4 +568,6 @@ type doCopyOpts struct {
 
 	// sobug 增加目标路径属性
 	dst string
+	// sobug 增加文件最终修改时间
+	fileModTime time.Time
 }

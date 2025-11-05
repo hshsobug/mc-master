@@ -503,6 +503,7 @@ func uploadSourceToTargetURL(ctx context.Context, uploadOpts uploadSourceToTarge
 			multipartThreads: uint(multipartThreads),
 			ifNotExists:      uploadOpts.ifNotExists,
 			dst:              uploadOpts.dst,
+			fileModTime:      uploadOpts.fileModTime,
 		}
 
 		// log.Println("Starting upload...")
@@ -598,4 +599,6 @@ type uploadSourceToTargetURLOpts struct {
 	ifNotExists         bool
 	// sobug 增加目标路径属性
 	dst string
+	// sobug 增加文件最终修改时间
+	fileModTime time.Time
 }

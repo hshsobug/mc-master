@@ -1119,6 +1119,7 @@ func (c *S3Client) Put(ctx context.Context, reader io.Reader, size int64, progre
 	}
 
 	opts.Dst = putOpts.dst
+	opts.FileModTime = putOpts.fileModTime
 	// sobug
 	// t := reflect.TypeOf(opts)
 	// for i := 0; i < t.NumField(); i++ {
