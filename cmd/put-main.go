@@ -454,8 +454,14 @@ func calculateDynamicPartSize(fileSize int64) string {
 		partSize = 256 * 1024 * 1024
 	case theoreticalMinPartSize <= 512*1024*1024: // 512MiB
 		partSize = 512 * 1024 * 1024
-	default: // 超过512MiB，使用1GiB
+	case theoreticalMinPartSize <= 1024*1024*1024: // 1GiB
 		partSize = 1024 * 1024 * 1024
+	case theoreticalMinPartSize <= 2*1024*1024*1024: // 2GiB
+		partSize = 2 * 1024 * 1024 * 1024
+	case theoreticalMinPartSize <= 4*1024*1024*1024: // 4GiB
+		partSize = 4 * 1024 * 1024 * 1024
+	default: // 超过4GiB，使用5GiB
+		partSize = 5 * 1024 * 1024 * 1024
 	}
 
 	// 确保分片数量不超过最大值
