@@ -36,22 +36,22 @@
     "#1": {
       "0000": {
         "fixed": {
-          "file_version": "25.11.5.6",
-          "product_version": "25.11.5.6"
+          "file_version": "25.11.18.7",
+          "product_version": "25.11.18.7"
         },
         "info": {
           "0409": {
             "Comments": "",
             "CompanyName": "shinewonder",
             "FileDescription": "minio client",
-            "FileVersion": "25.11.5.6",
+            "FileVersion": "25.11.18.7",
             "InternalName": "",
             "LegalCopyright": "© 2025 shinewonder",
             "LegalTrademarks": "",
             "OriginalFilename": "",
             "PrivateBuild": "",
             "ProductName": "minio client",
-            "ProductVersion": "25.11.5.6",
+            "ProductVersion": "25.11.18.7",
             "SpecialBuild": ""
           }
         }
