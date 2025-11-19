@@ -257,7 +257,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 
 	// 生成7天有效期的STS凭证
 	params := STSCredentialParams{
-		STSEndpoint:       "http://" + args.Host + ":" + strconv.Itoa(args.Port),
+		STSEndpoint:       "https://" + args.Host + ":" + strconv.Itoa(args.Port),
 		LDAPUsername:      args.Username,
 		LDAPPassword:      args.Password,
 		SessionPolicyPath: "",
@@ -284,7 +284,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 	mc.GlobalSessionToken = credentialCache.SessionToken
 
 	mc.Alias = newAlias
-	mc.Url = "http://" + args.Host + ":" + strconv.Itoa(args.Port)
+	mc.Url = "https://" + args.Host + ":" + strconv.Itoa(args.Port)
 
 	// 4. 使用临时凭证配置MinIO客户端
 	// httpHostParams := []string{
@@ -309,7 +309,7 @@ func (s *HTTPService) SftpSetParameters(r *http.Request, args *HTTPParameters, r
 			if time.Now().After(credentialCache.ExpiryTime.Add(-24 * time.Hour)) {
 				log.Println("检测到凭证即将过期，自动刷新...")
 				params := STSCredentialParams{
-					STSEndpoint:    "http://" + args.Host + ":" + strconv.Itoa(args.Port),
+					STSEndpoint:    "https://" + args.Host + ":" + strconv.Itoa(args.Port),
 					LDAPUsername:   args.Username,
 					LDAPPassword:   args.Password,
 					ExpiryDuration: 168 * time.Hour,
@@ -359,7 +359,7 @@ func (s *HTTPService) SftpStartTransfer(r *http.Request, args *HTTPTransferParam
 	accessKeyID := credentialCache.AccessKey
 	secretAccessKey := credentialCache.SecretKey
 	sessionToken := credentialCache.SessionToken
-	useSSL := false
+	useSSL := true
 	credentialMutex.Unlock()
 
 	log.Println("GlobalHTTPParameters.Username.", GlobalHTTPParameters.Username)
