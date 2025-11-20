@@ -45,6 +45,12 @@ func init() {
 	syscall.NewLazyDLL("kernel32.dll").NewProc("SetDllDirectoryW").Call(0)
 }
 
+// 通过 ldflags 注入的版本信息
+var (
+	Version   string = "dev"     // 编译时注入的版本号
+	BuildTime string = "unknown" // 编译时注入的构建时间
+)
+
 func main() {
 	// 创建退出信号channel和context
 	quit := make(chan struct{})
@@ -67,6 +73,9 @@ func main() {
 	// 获取命令行参数
 	log.Println("os.Args:", os.Args)
 	port := os.Args[1]
+	// 在程序启动时打印版本信息
+	log.Printf("MinIO Client Version: %s", Version)
+	log.Printf("Build Time: %s", BuildTime)
 
 	// 集成xmlrpc
 	RPC := rpc.NewServer()
