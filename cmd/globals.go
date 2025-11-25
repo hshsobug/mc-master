@@ -73,7 +73,7 @@ var (
 	globalJSONLine     = false               // Print json as single line.
 	globalDebug        = false               // Debug flag set via command line
 	globalNoColor      = false               // No Color flag set via command line
-	globalInsecure     = true                // Insecure flag set via command line sobug 跳过https证书验证
+	globalInsecure     = false               // Insecure flag set via command line sobug 取消跳过https证书验证
 	globalResolvers    map[string]netip.Addr // Custom mappings from HOST[:PORT] to IP
 	globalAirgapped    = false               // Airgapped flag set via command line
 	globalSubnetConfig []madmin.SubsysConfig // Subnet config
